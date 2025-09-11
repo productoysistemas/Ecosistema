@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecosistemas de Costa Rica</title>
+<link rel="icon" href="https://placehold.co/32x32/264746/ECE2D2?text=E" type="image/png">
+    <!-- Importa la fuente 'Google Sans Text' para una estética auténtica -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Reseteo básico y estilos globales inspirados en Google */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: 'Google Sans Text', sans-serif;
+            background-color: #f5f5f5; /* Color de fondo global neutro */
+            box-sizing: border-box;
+        }
+
+        .main-content {
+            display: flex;
+            flex-grow: 1;
+            height: 100%;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Contenedor del mapa */
+        .map-wrapper {
+            flex-grow: 1;
+            background-color: #edd5bf; /* Color base del mapa */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .map-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: grab;
+        }
+
+        .map-container.dragging {
+            cursor: grabbing;
+        }
+
+        .map-container svg {
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+        }
+
+        /* --- ESTILOS DEL MAPA BASE (INSPIRADO EN GOOGLE MAPS "SILVER") --- */
+        #costa-rica-map-svg #features path {
+            fill: #57887b; 
+            stroke: #a2c7c2; 
+            transition: fill 0.3s ease;
+        }
+
+        /* --- ESTILOS DE MARCADORES (SE CONSERVAN LOS COLORES ORIGINALES) --- */
+        .ecosystem-marker {
+            stroke-width: 0; 
+            cursor: pointer;
+            opacity: 1;
+            transform-origin: center center;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease-out;
+        }
+
+        .ecosystem-marker.expanded,
+        .ecosystem-marker.active {
+            stroke-width: 3px; /* Ancho del marco de color unificado */
+        }
+
+        .ecosystem-marker.active {
+            opacity: 1;
+            filter: drop-shadow(0 5px 12px rgba(0,0,0,0.5)) brightness(1.2);
+        }
+        
+        .ecosystem-label {
+            fill: #212121;
+            font-weight: 500;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+            transition: all 0.6s ease-in-out;
+            stroke-width: 0;
+        }
+        
+        .ecosystem-label.on-image {
+            fill: #FFFFFF;
+            font-weight: 700;
+            text-shadow: 0px 0px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        .ecosystem-label.external {
+            font-size: 18px !important;
+            font-weight: 700;
+            text-anchor: middle;
+        }
+
+        .ecosystem-marker.hidden,
+        .ecosystem-label.hidden {
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+
+        .location-marker {
+            stroke-width: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease, filter 0.2s ease;
+            cursor: pointer;
+        }
+
+        .location-marker.visible {
+            opacity: 0.9;
+        }
+
+        .location-marker:hover {
+            opacity: 1;
+            filter: brightness(1.2);
+        }
+
+        .location-marker-text {
+            fill: #000000;
+            font-size: 11px;
+            font-weight: 700;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            stroke-width: 0;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+
+        .location-marker-text.visible {
+            opacity: 1;
+        }
+
+        /* Botón de UI estilo Google Maps */
+        .map-action-button {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            z-index: 1000;
+            padding: 10px 16px;
+            background-color: #ffffff;
+            color: hwb(166 10% 65%);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Google Sans Text', sans-serif;
+            font-weight: 500;
+            font-size: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        }
+
+        .map-action-button:hover {
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+            background-color: #f8f9fa;
+        }
+
+        .map-action-button:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.20);
+        }
+        
+        /* Navegador de ecosistemas */
+        .ecosystem-navigator {
+            position: absolute;
+            top: 125px; 
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 999;
+            opacity: 0;
+            transform: translateX(20px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            pointer-events: none;
+        }
+
+        .ecosystem-navigator.visible {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            cursor: pointer;
+        }
+
+        .nav-label {
+            background-color: rgba(18, 71, 58, 0.75);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-right: 10px;
+            font-size: 16px; 
+            white-space: nowrap;
+            opacity: 1; 
+            transform: translateX(0);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            pointer-events: none;
+        }
+
+        .nav-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(35, 106, 92, 0.225);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            flex-shrink: 0; 
+        }
+
+        .nav-item:hover .nav-circle {
+            transform: scale(1.15);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+        }
+        
+        /* Contenedor de precarga de imágenes */
+        #image-preloader {
+            display: none;
+        }
+
+        .info-panel-container {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            width: 400px;
+            max-height: 80vh;
+            z-index: 1001;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.4s ease, visibility 0.4s, transform 0.4s ease;
+        }
+
+        .info-panel-container.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: all;
+        }
+
+        .info-panel-container.hidden {
+            transform: translate(calc(-100% - 40px), -50%);
+        }
+
+        .info-panel {
+            position: relative;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-height: 80vh;
+        }
+
+        .info-panel h3 {
+            display: none;
+        }
+
+        .info-panel p {
+            margin: 0;
+            font-size: 18px;
+            line-height: 1.6;
+            color: #000000;
+        }
+
+        .info-panel::-webkit-scrollbar {
+            width: 12px;
+        }
+        .info-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .info-panel::-webkit-scrollbar-thumb {
+            background-color: var(--scrollbar-color, #57887b);
+            border-radius: 10px;
+            border: 4px solid transparent;
+            background-clip: content-box;
+        }
+        .info-panel::-webkit-scrollbar-thumb:hover {
+            background-color: var(--scrollbar-hover-color, #4a7569);
+        }
+
+
+        .lang-switcher {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1001;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            display: flex;
+            overflow: hidden;
+        }
+        .lang-switcher button {
+            background-color: transparent;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: 'Google Sans Text', sans-serif;
+            font-weight: 500;
+            font-size: 14px;
+            color: #757575;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .lang-switcher button.active {
+            background-color: #57887b;
+            color: white;
+        }
+
+        #panel-toggle-btn {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 36px;
+            background-color: #ffffff;
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            transition: all 0.4s ease;
+            z-index: 1002;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #panel-toggle-btn.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .info-panel-container.visible:not(.hidden) + #panel-toggle-btn {
+            transform: translateY(-50%) translateX(calc(400px + 20px));
+        }
+
+        #panel-toggle-btn svg {
+            width: 24px;
+            height: 24px;
+            transition: transform 0.4s ease;
+        }
+
+        .info-panel-container.hidden + #panel-toggle-btn svg {
+             transform: rotate(180deg);
+        }
+        
+        @media (max-width: 767px) {
+            .map-action-button {
+                top: 70px;
+                right: 20px;
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+            .ecosystem-navigator {
+                position: absolute;
+                top: 125px;
+                right: 10px;
+                gap: 8px;
+            }
+            .nav-circle {
+                width: 28px; 
+                height: 28px;
+            }
+            .nav-label {
+                font-size: 14px;
+            }
+            .info-panel-container {
+                width: calc(100% - 40px);
+                left: 10px;
+            }
+            .info-panel-container.visible:not(.hidden) + #panel-toggle-btn {
+                transform: translateY(-50%) translateX(calc(100% - 40px));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-content">
+        <div class="map-wrapper">
+            <div class="map-container" id="map-container">
+                <svg baseprofile="tiny" fill="#6f9c76" height="1000" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width=".5" version="1.2" viewbox="0 0 1000 1000" width="1000" xmlns="http://www.w3.org/2000/svg" id="costa-rica-map-svg">
+                    <defs id="image-patterns"></defs>
+                    <g id="features">
+                        <path d="M607.7 113.2l0 0.7-0.4 34.3-0.3 25.8-0.3 18.4-0.2 22-1.9 24.3 0 0.4-2.9 3.1-0.8 1.2-0.1 0.5 0 0.5 0 0.8 0.3 1.4-2.3 2.6-4.4 1.4-10.6 3-2.8 0.4-0.8-0.3-1.9-0.2-0.8-0.2-0.6-0.2-3.1-0.5-3.1-0.9-3.8 0.8-7 0.5-4.9 2.2-1.3 0.8-0.1 0.2-0.2 0.4-1.9 1.8-2.7 1.4-1 0.8-0.5 0.6 0.1 0.4-0.1 0.5-2.9 3.7-0.3 0.6-0.2 1.2-0.3 0.3-1.1 0-3.4-4.6-1.5-1.1-1.8-0.4-2.1-0.1-2.6-0.7-3.3-1.3-1.1-0.8-0.5-0.6 0.2-0.8 0-1 0.1-0.4 0.2-0.4 0.3-0.2 1.1-0.5 2.9-4.6 1.2-1.2 1.8-0.5 7.8-5.1 2.4-1 0.8-0.4 0.5-0.5 0.2-0.4 0.1-1.1-2-3.3-1.1-0.6-0.4 0.2-1.3 0.9-1.2 0.4-0.5 0-0.3-0.1-0.2-0.3-0.2-0.5-0.1-0.3-1-1.6-2.6-3.1-1.3-2.1-2.5-3.2-1-1.4-1.7-3.7-0.7-2.5 0.6-4.1-0.1-0.6-0.2-0.9-0.8-1.6-0.2-0.6 0-0.6 1-3.6 0.4-1.2 1.7-3.1 0.2-0.8-0.1-0.6-0.2-0.2-1-0.8-0.6-0.9-0.9-2.5-2.8-1.8-1.2-0.2-0.4 0.2-0.4 0.1-1 0.6-2.2 0.7-3 0.5-1.3 0.1-0.9-0.1-1-0.7-0.3-0.2-1-1.2-3.5-5.7 2.5-4.8 0.3-1.6-0.4-0.7-0.2-0.3-0.5-1.1-0.6-3 2.4-8.8-3.4-6.9-1.2-1.9-9-7-2.9-1.4-8.6-2.3-2.2-0.9-1.7-1.9-4.2-3.7-0.5-0.6-0.9-1.4-0.5-1.1-0.7-4.3-1.8-3.3-2.3-3.6-0.9-1-1-0.7-2.2-0.9-1.7-0.5-8.4-2-2.5-0.8-1-0.8-1.1-1.1-4.7-3.2-1.2-0.6-1-0.4-1-0.1-1 0.1-2 0.2-3.4 0.9-4.1 0.3-4.8-0.1-3.8-7.8-1.4-2.1-0.7-0.5-0.4-0.2-0.4-0.2-0.4-0.1-3.5-0.5-1-0.3-3.8-2.3-1.8-1.3-7.2-8.4-0.2-0.3-0.3-0.6-0.1-0.5 0.1-0.3 0.6-0.7 5.4-0.4 1.4-0.7 0.5-0.7 0.3-0.7 12.4-8.5 7.5-8.5 0.6-0.5 0.4-0.1 0.6-0.1 1-0.3 1.2-0.3 0.3-0.3 22.7 8.4 25.5 9.5 3.6 0.4 3.7-1.4 16.3-10.8 11.7-7.7 5-1.2 2.8 1.2 6 4.4 2.7 0.4 3.4-0.2 3.7 1.2 7.8 3.4 0.9 0.3 0.8 0.3 0.8 0.4 0.6 0.5 3.6 4.5 1.4 1.1 1.4 0.9 1.7 0.6 1.7 0.2 1.5-0.6 8.5-5.6 1.3-0.8 1.5 0.8 0.4 1.2 0 1.6 0.3 2 0.7 1.1 2.1 2.7 0.4 1.1 1.7 1.6 7.3 2.8 1.7 1.2 1.4 1.5 3 1.6 2.8 2.3 0.5 3.8-2.1 1.2-0.7 0.4-0.7 1.3 0.3 0.9 0.6 0.7 0.4 0.5 3.5 2.8 0.8 1.1 1.8-1.3 2.4 0.1 1.1 0.1z" id="CRA" name="Alajuela">  </path>
+                        <path d="M437.4 70.7l-0.3 0.3-1.2 0.3-1 0.3-0.6 0.1-0.4 0.1-0.6 0.5-7.5 8.5-12.4 8.5-0.3 0.7-0.5 0.7-1.4 0.7-5.4 0.4-0.6 0.7-0.1 0.3 0.1 0.5 0.3 0.6 0.2 0.3 7.2 8.4 1.8 1.3 3.8 2.3 1 0.3 3.5 0.5 0.4 0.1 0.4 0.2 0.4 0.2 0.7 0.5 1.4 2.1 3.8 7.8 4.8 0.1 4.1-0.3 3.4-0.9 2-0.2 1-0.1 1 0.1 1 0.4 1.2 0.6 4.7 3.2 1.1 1.1 1 0.8 2.5 0.8 8.4 2 1.7 0.5 2.2 0.9 1 0.7 0.9 1 2.3 3.6 1.8 3.3 0.7 4.3 0.5 1.1 0.9 1.4 0.5 0.6 4.2 3.7 1.7 1.9 2.2 0.9 8.6 2.3 2.9 1.4 9 7 1.2 1.9 3.4 6.9-2.4 8.8 0.6 3 0.5 1.1 0.2 0.3 0.4 0.7-0.3 1.6-2.5 4.8-2.5-2-0.7-0.3-0.9-0.3-0.8-0.1-1.2 0.1-0.7 0.1-0.5 0.2-0.9 0.7-1.4 1.4-0.6 0.5-1.4 0.8-0.9 0.6-0.7 0.7-0.5 0.7-0.3 0.5-0.1 0.5 0 0.5 0.1 0.4 0.2 0.3 0.2 0.4 1.2 1 0.2 0.3 0.1 0.5 0.1 0.4-0.1 0.4-0.7 2.1-0.4 3.1-0.1 0.5-1 2-0.1 0.6 0 0.4 0.1 0.4 0.1 0.4 0.2 0.3 0.5 0.6 0.3 0.4 0.1 0.6-0.1 1.2-0.3 0.5-0.3 0.5-3 1.3-0.7 0.4-2.9 2.6-0.7 0.9-0.4 0.7-0.2 1 0 0.5 0.2 0.9 0.6 1.7 0.1 0.6-0.3 0.3-0.4 0-0.4-0.1-0.4-0.1-1.5-0.8-1.2-1-0.6-0.6-1.9-2.4-1.2-1-0.3-0.3-1.4-0.8-0.8-0.3-0.5-0.1-0.5 0-0.6 0.1-0.8 0.3-0.3 0-0.4 0-0.4-0.1-0.4-0.1-0.3-0.3-0.6-0.4-0.3-0.2-0.5-0.1-0.4 0-0.9 0.2-1 0.1-0.5 0-0.5-0.1-1.3-0.1-3.1 1-0.7-0.5-0.6-0.3-2.1-1.9-2.9 1-10.6 0.1-2.9-0.7-2.5-1.8-3.9-4.1 0-1 0.9-3-2.8-3.3-6.8-4.8 1 3.3 4.6 3.3 1 3.9 0.4 7.5 1 4.3 1.8 3-2 1.3 0.3 2.3 1.8 2.1 4.9 1.7 1.7 1.8 2 4 1 0 1.3-0.5 0.6 0.4 0.2 1.1-1.4 0.1-1.4-0.1-1.3-0.4-1.2-0.6 0 1 3 2.7-1.6 5.2-1 1.3-3.4 0.8-0.8 0.4-4.1 2.3-0.7 0.2-0.4-0.1-0.3-0.3-0.2-0.3-0.3-0.2-1.1 0.1-1.6 0.5-3.9 1.9-1.4 1.3-0.7 1.3 0.3 0.9 0.5 0.7 0.6 0.5 0.7 0.4 0.6 0.1 1.5-0.2 0.5 0 0.5 0 1.4 0.3 0.4 0.1 0.7 0.4 0.4 0.2 0.4 0.1 1.5 0 0.9 0.2 1.1 0.6 1.2 0.4 0.3 0.2 0.3 0.2 0.7 1 0.9 0.8 0.4 0.7 0.2 0.3 0.2 0.4 0.3 0.7 0.2 1 0.2 0.9 0.2 0.3 0.3 0.2 0.4 0.2 2.3 0.5 0.3 0.3 0.1 0.4-0.5 1-0.6 1.7-1.6 6.1 0 1 0.2 0.7 0.4 0.5 0.1 0.3-0.1 0.3-0.9 0.8-0.4 0.4-0.3 0.7-0.4 1.4-0.4 0.7-0.4 0.4-0.4 0.3-0.4 0.4-1 2.1-0.4 0.2-0.4 0.1-0.9 0.4-0.4 0.5-0.8-2-0.7-0.8-1.5-0.9-3.9-1.6-0.3-1.3 0-1.5-0.1-1.1-3.8-4.1-5.2-3-17-6.1-1.5 0.3-2.3 1.6-1 0.4-1.5-0.4-2.1-1.5-1.8-0.4-1-0.1-0.3-0.2-0.2-0.5-0.6-0.7-1.1-0.6-0.9 0.3-0.7 0.5-0.1 0.3-8.9-2.9-4.3-0.6-1-0.7-0.8-0.7-1.2-0.7-1.8 0.1-1.2 0.7-1 0.1-1.4-1.9 1.1-2.9-1.7-4.1-16.1-19.9-1-1.8-1.3-4.3-1.9-3-6.2-15.2-0.5-4.5-0.7-2.8-0.9-2 2.2-2.1 0.9-1.6-0.4-1.3-3.3-4.3-2.2-1.3 1.2-1.5 2.8-2.2 1.8-2.7 1.3-2.7 2.7 1.1 1.5-1.7 1.1-2.5 3.4-2.6-1.3-2.8-2.4-3-1.7-1.7 1-0.7 0.4-0.3 0.8-0.1 0-1.1-2.2 0 0-1.1 1.8-0.4 1.2-1.1 1.3-3 1.1 0 2.2 1.8 3.1-1.3 3.2-1.8 2.4 0.3 1 0-0.2-2.1 0.5-1 0.9-0.6 0.8-0.7 1.5-2.5 0.5 0.1 2 0.2 4.7-5-0.3-1.3-0.8-1-2.1-1.5-6.5 6.6-0.1-0.5 0-0.5-0.2-0.3-0.7 0.1 0-1 1.8-2 1.1-0.8 1.4-0.5-1.1-1.1-0.1 0.2-0.3 0.3-0.3 0.3-0.5 0.3 0.4-1.3 0.1-0.5 1.8-0.5 0-1-1.1 0 0-1.2 2.6-2.1 0.6-5.4-0.9-10.6-2.4-2.8-5.2-2.4-5.3-0.8-2.3 1.6-1 0-4.3-3.6-1.3-1.4 0.7 0.3 1-0.5 0.4-0.9-0.9-1.1-1.2-0.3-3 0.3-1.3 0-4.7-1.7-3.6-2.2-4.1-1.8-5.9-0.8 0-1.2 3.5-0.9 6.7-3 3.8-0.5-0.6-0.9-0.5-0.7-0.7-0.3-1.5-0.3 0-1 7.9-0.5 1.9 0.5 0.9 1.2-0.2 1.4-0.4 1.2 0.3 0.5 0.6 0.3 2.1 1.9 1 0 1.1-1.2 0-1-1.8-1.8 1.8-1.1 3.3-0.5 3.2 0.1 1.1 0.6 1.4 1.4 1.3 0.2 1-0.3 0.4-1-0.1-1.1-0.8-0.8 0-1.2 2.3-0.9 0.7-1.8-0.5-2.1-1.3-1.8-1.2-0.9-2.6-1.1-1.2-0.8-1.3-1.4 0-0.4 0.8-0.1 1.1-0.8 2.4-2.3 1.4 0.8 1.6 1.5 3.2 0 1.9-1.8-0.4-2.3-1.7-2.3-2-1.4-1.3-0.6 3.8-6.2 2.9-6.3 4.4-6 5.3-2.2 4.5 2.3 4.5 4 5.1 2.9 16 6 21.3 7.9 5.6 2.1z" id="CRG" name="Guanacaste">  </path>
+                        <path d="M669.9 115.6l10.4-2.5 5.5-2.8 0.5-4.4-1.4-5.7-0.1-3.6-1.6-0.8 0.5-2.1-0.3-1-0.4-0.1-1.2-2.9-1.2-0.3 1.5-0.2 0.8 0.4 0.5-0.1 0.9 0.5 0 0.3-0.4 0.3 0 0.5 0.6-0.1 0.8-0.7 0.2-0.7 0.7 0.2 2.6 1.3 3.2 3.7 4 7.5 2.9 7.9-0.4 5.1-2.3-2.9-4.2-10.3 2.7 12.9-0.3 5.1-4.5 4 2.4-0.5 1.6-1.1 1.6-1.4 2-1.3-0.7 0.8-0.2 1 0.3 1.1 0.6 1.4 0.6-1.9 0.7-3.7 0.9-2 7.6 21.2 9.6 22.8 11.3 19 30.2 39.6 2.4 1.8 10 12.4 6.2 6.1 3.8-2.1 1.4 1 4.2 0.7 0.9 1.2 0.1 3 0.5 2.5 1.1 2.2 2.1 2.2 7.3 10.9 2.4 1.7 9.1 12.3 6.9 6.5 4-1.2 0.9 2.5 0.9 6.5 1.4 2.9 2.5 1.9 10.6 3.7 3.7 0.4 3.7-0.1 3.5 0.2 3.1 1.7 3.9 6 2.7 1.6 0.1 0.1 1.7 6-0.5 0-0.7 0.1-2.4-1.3-2.4-0.4-0.4 0.6-0.7 1.1-0.7 5.9 0 0.3-1 2-2.1 0.3-2.9-0.5-2.8-0.8-1.6-0.8-1.5-1.7-0.1-0.1-2-3.8-0.1-0.1-1.6-1.8-0.1 0-0.7 0.4-0.4 0.2-1.6-0.6-6.5-5.6-0.7-0.3-1.1-0.4-3.9-1.6-1.4-0.5-2.1-0.9-2.9 0.4-2.9 2.5-1.8 2.5-0.3 1.5 0.6 1 0.8 1.5 0.5 0.9 0.8 3.3 0.3 1.1 0.7 0.9 1 0.3 0.4 0.3 0.3 0.2-0.2 1.3-0.5 0.2-1.9 1.1-8.4 1.2-3 1-0.8 1.4-0.5 0.9-0.4 3 0.2 13.3 0.2 19.2 0.4 26.2-0.1-0.1-1.5-1.3-0.5-0.3-2.6-0.8-2.6-2.7-0.8-1.2-1-2.7-0.9-1.4-0.6-0.4-1-0.4-5.4-1.5-0.5-0.3-0.5-0.4-0.4-0.9-0.3-0.5-1.7-8.6-0.5-1.6-0.4-0.7-0.2-0.3-0.3-0.3-0.4-0.2-5.6-3.3-0.6-0.4-1.2-1.1-6.1-8-0.7-0.2-1.1-0.1-3.4 0.2-2.1 0.4-0.6 0-0.8-0.1-1.1-0.4-2.5-1.2-1.5-1-0.8-0.4-2.9-1-0.8-0.4-0.3-0.2-0.4-0.2-2.9-2.5-0.7-0.5-0.8-0.4-0.5 0-0.7 0.1-1.1 0.6-0.6 0.4-0.4 0.4-1.9 2.6-0.2 0.3-0.7 0.2-3 0.3-0.8 0.2-0.6 0.3-0.6 0.6-0.3 0.2-0.3 0.2-0.4 0.1-0.3-0.2-0.4-1.2-0.1-0.6-0.2-0.4-0.5-0.5-0.5-0.3-4.2-1.2-1.9-1.4-0.6-0.5-1.3-1.9-5.2-14.4-0.6-1.7-1-2.2-0.4-0.4-0.5-0.6-0.3-0.4-0.9-2.2-0.3-1.9-0.4-1.6 0.6-4.9 2.2-4.5 9.1-11 3.5-9 1.3-2 4.8-5.8 6.7-8.4 1-2.8-0.4-2.9-1.8-5.7-0.2-3.5 0.5-2.8 1.2-2.7 2-2.8 0.4-0.6-3.2-0.7-16.7-0.4-22.8-0.2-4.1-1.5-15.5-7.2-9.5-4.5-6.9-3.3-19.8-9 2.1-7.2 1.1-1.4 1.4-1.4 7.4-8 0.5-0.8 2-4.1 0.4-1.2 0.2-0.8-0.1-0.5 0.1-1.9 0.5-2.3 0.2-1.2-0.1-0.8-0.1-0.3-0.5-0.6-0.4-0.7-0.3-0.8-0.5-1.7-2.1-4-0.2-0.6-0.4-2.3 0.1-1 0.1-0.7 0.6-1.1 0.4-0.7 1.3-2.4 0.3-0.4 0.4-0.2 0.4 0 0.4-0.1 0.4-0.2 0.3-0.3 0.6-0.6 1.4-2.2 0.9-3.4 0-0.8 0-0.4-0.7-1.6-0.1-0.5 0-0.5 0.1-1.3 0.1-0.6-0.1-0.4-0.2-0.4-0.2-0.3-0.5-0.6-0.2-0.4-0.2-0.3 0-1 0.9-6.9-0.1-1.5 0.2-4.9 0.2-1.4 0.3-1 0.2-0.3 0.6-0.5 1.4-0.9 1.5-0.8 0.6-0.4 1.6-1.8 2.7-1.7 1.6-0.5 0.9-0.2 4.6-0.4 1.7-0.5 0.6 0 0.6 0.1 0.7 0.2 0.1-0.1 0-0.3-0.3-0.5-0.4-0.5-0.6-0.5-1.3-0.8-0.7-0.5-0.5-0.6-0.5-0.6-0.1-0.6-0.1-0.7 0.5-3.3 0-0.5-0.1-0.6-0.5-0.7-0.6-0.7-0.7-0.8-0.4-0.3-0.4-0.2-0.5-0.2-1.8-0.5-0.5-0.4z" id="CRL" name="Limón">  </path>
+                        <path d="M508.5 189.2l3.5 5.7 1 1.2 0.3 0.2 1 0.7 0.9 0.1 1.3-0.1 3-0.5 2.2-0.7 1-0.6 0.4-0.1 0.4-0.2 1.2 0.2 2.8 1.8 0.9 2.5 0.6 0.9 1 0.8 0.2 0.2 0.1 0.6-0.2 0.8-1.7 3.1-0.4 1.2-1 3.6 0 0.6 0.2 0.6 0.8 1.6 0.2 0.9 0.1 0.6-0.6 4.1 0.7 2.5 1.7 3.7 1 1.4 2.5 3.2 1.3 2.1 2.6 3.1 1 1.6 0.1 0.3 0.2 0.5 0.2 0.3 0.3 0.1 0.5 0 1.2-0.4 1.3-0.9 0.4-0.2 1.1 0.6 2 3.3-0.1 1.1-0.2 0.4-0.5 0.5-0.8 0.4-2.4 1-7.8 5.1-1.8 0.5-1.2 1.2-2.9 4.6-1.1 0.5-0.3 0.2-0.2 0.4-0.1 0.4 0 1-0.2 0.8 0.5 0.6 1.1 0.8 3.3 1.3 2.6 0.7 2.1 0.1 1.8 0.4 1.5 1.1 3.4 4.6-1.4 1.2 1.5 0.6 1.1 0.7 0.7 0.5 0.5 0.5 0.3 0.3 0.9 1.3 0.8 1.5 0.1 0.6 0.1 0.9-0.2 1.3-0.3 0.6-0.3 0.4-0.3 0.3-0.4 0.1-0.4 0.1-0.5 0.1-3-0.2-1 0.1-0.4 0.2-0.4 0.2-0.3 0.2-0.2 0.4-0.1 0.3-0.1 0.5 0.1 0.4 1.2 4 0.4 2-0.1 3.1 0 0.5 0.4 0.9 3.5 6.2 0.1 0.3 1.1 5.4 0.4 1.2 0.7 1.5 1 1.3 1.1 1 0.5 0.4 1.6 0.2 4.9-0.8 1.1 0.4 0.4 0.1 0.6 0 2.5-0.7 0.5 0 0.5 0.1 0.3 0.2 0.4 0.2 0.7 0.8 0.3 0.3 0.4 0.2 0.4 0.1 0.4 0.1 0.5-0.1 0.4-0.2 0.5-0.4 0.9-1.9 0.3-0.4 0.4-0.4 1.8-1.4 0.5-0.6 0.4-0.4 0.1-0.4 0.1-1-0.5-3.2 0-0.4 0.4-0.2 0.9-0.2 1.8 0 4.2-0.8 6.7-0.3 2.3 0.2 0.9 0.7 0.6 0.5 1.1 1.3 0.2 0.3 1.7 0.3 5.6-0.2 2.1 0.9 2.3 0.2 7.1-0.6 1.4 0.1 0.4 0.2 0.5 0.4 0.4 0.7 0.4 1.3 0 0.7 0 0.6-0.3 1.4-0.1 1 0 0.5 0.3 0.6 0.5 0.6 1.2 1.1 1.3 0.5 0.7 0.1 1.4-0.2 2.1-0.1 1.4 0.2 0.8 0.3 0.4 0.3 0.4 0.6 0.3 0.8 0.3 2 0 1-0.1 0.7-0.4 0.7-0.4 0.8 0.6 1 3.5 1.6 2.5 4.9 3.6 3.6 10.4 6.9 2.4 0.8 0.2-0.4 0.3-0.3 0.3-0.2 0.3-0.3 0.4-0.1 0.4-0.2 0.4 0 0.5 0 0.4 0.1 0.5 0.3 0.6 0.6 1.1 2 0.2 0.7 0.7 3 0.2 0.4 5.1 5.2 1 1.4 0.6 1-0.2 1.6 0 1 0.2 1.8 1.1 3.2 0.7 1.5 0.4 0.7 0.6 0.6 1.1 1 7.9 3.6 1.1 0.3 0.5-0.1 0.4-0.1 0.3-0.2 0.2-0.3 1.4-2 0.3-0.2 0.4-0.2 0.4-0.2 0.5-0.1 0.5 0 0.4 0 0.4 0 0.5 0.1 1.5 0.8 2.2 2.1 3.6 4.4 0.5 1 0.1 0.4 0.1 0.4 1.2 4.2 0.1 0.3 0.5 0.6 1 1.3 14.4 9.3 0.3 0.2 1.7-0.1 1.4-0.2 0.4-0.1 0.5 0.1 0.4 0.2 0.7 0.5 0.7 0.8 0.3 0.3 0.7 0.4 0.4 0.1 0.4 0.1 0.5 0 0.3-0.2 0.3-0.2 0.3-0.2 1.7-2.4 0.6-0.6 0.5-0.3 0.3-0.2 0.4-0.2 0.3-0.3 0.2-0.6 0.1-0.8-0.5-3.7 0.1-0.6 0.3-0.9 1.2-2.2 0.3-1-0.1-1.9-0.2-0.9-0.2-0.6-0.2-0.3-0.1-0.5-0.2-0.3-0.3-0.2-0.4 0-0.4 0-0.4-0.1-0.3-0.2-0.2-0.3-0.3-0.3-0.4-0.1-1.4-0.3-0.3-0.2-0.2-0.3 0-0.5 1.5-8 0.1-0.4 0.6-0.8 4.3-4.9 0.3-0.6 0.4-0.9 1.1-3.9 0.5-0.9 0.4-0.6 3.4-3.6 4.2 1.2 0.5 0.3 0.5 0.5 0.2 0.4 0.1 0.6 0.4 1.2 0.3 0.2 0.4-0.1 0.3-0.2 0.3-0.2 0.6-0.6 0.6-0.3 0.8-0.2 3-0.3 0.7-0.2 0.2-0.3 1.9-2.6 0.4-0.4 0.6-0.4 1.1-0.6 0.7-0.1 0.5 0 0.8 0.4 0.7 0.5 2.9 2.5 0.4 0.2 0.3 0.2 0.8 0.4 2.9 1 0.8 0.4 1.5 1 2.5 1.2 1.1 0.4 0.8 0.1 0.6 0 2.1-0.4 3.4-0.2 1.1 0.1 0.7 0.2 6.1 8 1.2 1.1 0.6 0.4 5.6 3.3 0.4 0.2 0.3 0.3 0.2 0.3 0.4 0.7 0.5 1.6 1.7 8.6 0.3 0.5 0.4 0.9 0.5 0.4 0.5 0.3 5.4 1.5 1 0.4 0.6 0.4 0.9 1.4 1 2.7 0.8 1.2 2.6 2.7 2.6 0.8 0.5 0.3 1.5 1.3 0.1 0.1 0 1.7 4.7-2 1.5 0 1.1 0.9 0.5 1.2 0.5 1.2 0.7 1 0.9 0.6 3.6 1.5 7.2 5.4 7.2 2.5 2.1 1.4 4.1 6.9 0.5 1.3 0.1 0.2-0.1 0.2-0.6 0.9-1.6 2.7-4.7 2.8-16.3 6.7-1.8 1.4-0.5 0.7-1.1 1.3 0.8 0.7 1.3 0.8-0.1 2.2-0.1 0.2-1.3 1.5-1.3 0.8-2 1.2-1.4 0.9-0.2 0.2-1.1 1.2-0.2 2.4 0.8 2.3 1.4 2.1 4.9 5.5 2.7 3.8 1.9 4.1 1.3 4.8 0.7 8.3 0.1 1.8 0.1 1.1-0.5 5.6-1.4 4.7-2.7 3.2-0.8 1.1-4.1 2-4.5 1.4-4.5 2.3-0.5 0.5-0.6 0.5-0.6 0.7-2.9 2.7-2.4 2.3-1 0.6-0.9 0.5-5.3 3-1 0.8-0.4 0.3-0.2 2 1.5 1.6 4.4 2.6 0.8 0.9 1.5 2.2 0.9 0.7 1 0.1 1.9-0.8 1.5 0.2 2.7 1.5 1.1 1.6 0.7 5.1 5.2 11.4 2.7 6 0.1 0.2 0.4 0.7-0.8 7.1-0.4 1.3-0.6 2.3-2.2-1.7 0.3-2.4 1.2-2.7 0.7-2.4-0.5-2-10.7-18.5-3.8-4-19.6-14.3-5.4-5.3 4.6-5.7 0.9-0.5 0.9-1.6 1.7-2.1 1.1-2.5-1-2.5-5.2-6.5-0.8-1.8-0.1-2.4 1.1-0.8 2-0.6 2.4-1.6-1.8-0.5-4.6 0.2-2.3-0.8-1.2-1.4-3.1-6.2 0.5-0.8 0.3-0.6 0.3-0.9 1.1 0 1.5 2.6 0.4 1.3 0.2 2.1 0.7 0.4 4.7-1.9 0-1.2-2.1-0.9-2.3-1.7-2-2-1.1-1.9-1.1 0-1.2 1.9-2.9 0.1-3.3-0.3-2.4 0.5-1.2-2.2-1.8-2.2-2.2-1.2-2.3 1.2-5-3-1.4-2.4 1-3.3-1.1-0.1-1.1 0.1 0.7-2.6-2.3-1.3-3.3-0.7-2.6-0.9-1 1.9-0.8-0.1-1.1-0.8-1.5 0-0.8 0.9-0.2 1.1-0.6 1-2.2 0.4-5.2-0.8-2.1 0.8-0.8 3.2 1.2-1 0.9 0 5.6 8.3 0.7 2.6 3.3 5.1 1.2 1.5 2.1 1.1 5.9 1.8 2.4 0.3 2.1 1.3 2.1 2.5 2 1.7 1.9-1.2 0.1 4-0.3 1.6-0.9 1.1 0 1.1 2.3 3.2 1 5.6-0.4 5.8-1.8 4-3.5 0.1-5.8-1.8-5.4-2.7-2.6-2.1 1 0 0.7 0.5 0.6 0.3 2.1 0.2-3-1.3-1.3-0.8-1.3-1.2 0 2.3-9.1-4-3.2-0.5-9.7 1.2-2.7 0-2.2-1.1-2.2-2.2-3.8-5-13.7-12.8-0.9-1.5-0.7-0.1-3.2-1.4-1-0.6-0.5-4.9 4.8-7.5 1.1-1.3 2.5-1.4 1.7-0.7 0.8 0.5 0.5 0.9 1.1-1.1 3.8-5.9 1.1-1.1-2-2.5 2.4-2.9 4.3-2.3 3.9-1 0-1-3.4-0.4-1.8 0.1-1.1 1-1.9 2-1.8 0.8-0.6-1.5 0.7-2.7 2.2-2.7 3.9-1.9 1.8-1.2 0.8-1.8-1-1.7-2-1.1-1.9-1.5-0.4-2.8 3.1 1.6 1.4 0.5 2 0-1-1.2-1.2-0.9-2.2-1.2-1-0.8-0.5-0.7-0.9-0.5-1.8-0.1 1.9-1.2-0.3-0.8-1.1-0.7-0.5-0.5 0.7-1.8 0.8-1.3 1.1-1.1 1.6-1.4-4.2-11-0.8-1.4-2.6-2.8-1.1 1-3.5-4.6-3.2-5.4-4.2-4.2-6.3-1.1 0.4-4.2-3.5-3.5-4.8-2.4-3.5-1-12.4-11.9-12.2-5.7-1.9-1.5-15.2-6-1 0-1 0.8-0.9 0-0.7-0.7-0.6-1.3-2.2 1-1.3-1.1-1.5-1.5-2.7-0.5 1.7-2.9-2.2-4.2-4.1-3.6-4-1.4 0 1.1 1.4 0.3 0.9 0.4 2.1 1.5-4.1-0.7-6.5-3.9-4.1-0.9-4-0.3-21.1-5.9-4.1-0.3-1.9 0.3-2 0.7-2.1 0.4-2.1-0.3-1.9-1.6-0.6-1.9-0.7-1.5-2.2-0.5 0.4 0.6 0.2 0.5 0.4 1.2-2.6-2.1-5.9-3.8-1.1-2.4-0.6-2.2-1.4-1.1-1.7-0.7-1.7-1-0.6-1.6 0.3-1.7-0.5-1.1-2.4 0.1 0.6-1.8-0.2-1.8-0.4-1.6 0-1.5 0.9-1.8 2.7-2.7 1.1-2.7 1.1-1.3 1.1-1.8 0.5-2.3-0.5-1.9-1.3-1.7-2.4-2.4-6.4-9.6-1.8-1.4-2.6-1.1 0.4-2.4 2.2-3.7-3.9-3.2-0.7-1.6 0.8-2.3-4.5-1.4-14 1.4 0-1.2 2-0.8 2.4-0.2 5.5 0 0-1.1-5-0.2-4.5-0.8-4.1-1.4-3.7-2.1-4.8-3.9-0.7-0.9-1-0.2-2-1.4-1.5-1.5 0.8-0.7-2.6-1.4-6.5-6.1-3.5-1.7-1.6-1.5-1-0.4-0.8 0.4-0.7 0.6-0.9 0.1-1.3-1.1 0.9-1.7 0.3-1.1 3.1-1 1.3 0.1 0.5 0.1 0.5 0 1-0.1 0.9-0.2 0.4 0 0.5 0.1 0.3 0.2 0.6 0.4 0.3 0.3 0.4 0.1 0.4 0.1 0.4 0 0.3 0 0.8-0.3 0.6-0.1 0.5 0 0.5 0.1 0.8 0.3 1.4 0.8 0.3 0.3 1.2 1 1.9 2.4 0.6 0.6 1.2 1 1.5 0.8 0.4 0.1 0.4 0.1 0.4 0 0.3-0.3-0.1-0.6-0.6-1.7-0.2-0.9 0-0.5 0.2-1 0.4-0.7 0.7-0.9 2.9-2.6 0.7-0.4 3-1.3 0.3-0.5 0.3-0.5 0.1-1.2-0.1-0.6-0.3-0.4-0.5-0.6-0.2-0.3-0.1-0.4-0.1-0.4 0-0.4 0.1-0.6 1-2 0.1-0.5 0.4-3.1 0.7-2.1 0.1-0.4-0.1-0.4-0.1-0.5-0.2-0.3-1.2-1-0.2-0.4-0.2-0.3-0.1-0.4 0-0.5 0.1-0.5 0.3-0.5 0.5-0.7 0.7-0.7 0.9-0.6 1.4-0.8 0.6-0.5 1.4-1.4 0.9-0.7 0.5-0.2 0.7-0.1 1.2-0.1 0.8 0.1 0.9 0.3 0.7 0.3 2.5 2z m-69.9 94.7l0.4-0.5 0.9-0.4 0.4-0.1 0.4-0.2 1-2.1 0.4-0.4 0.4-0.3 0.4-0.4 0.4-0.7 0.4-1.4 0.3-0.7 0.4-0.4 0.9-0.8 0.1-0.3-0.1-0.3-0.4-0.5-0.2-0.7 0-1 1.6-6.1 0.6-1.7 0.5-1-0.1-0.4-0.3-0.3-2.3-0.5-0.4-0.2-0.3-0.2-0.2-0.3-0.2-0.9-0.2-1-0.3-0.7-0.2-0.4-0.2-0.3-0.4-0.7-0.9-0.8-0.7-1-0.3-0.2-0.3-0.2-1.2-0.4-1.1-0.6-0.9-0.2-1.5 0-0.4-0.1-0.4-0.2-0.7-0.4-0.4-0.1-1.4-0.3-0.5 0-0.5 0-1.5 0.2-0.6-0.1-0.7-0.4-0.6-0.5-0.5-0.7-0.3-0.9 0.7-1.3 1.4-1.3 3.9-1.9 1.6-0.5 1.1-0.1 0.3 0.2 0.2 0.3 0.3 0.3 0.4 0.1 0.7-0.2 4.1-2.3 0.8-0.4 3.4-0.8 1-1.3 1.6-5.2 3.6 3.2 9.5 3.9 1.3 0.7 1.1-0.4 2.5 1 6.1 3.5 2.8 0.9 3 0.1 2.9-1.2 1.8 1.5 4 2.5 1.8 1.5 0 1-3.1 0.8 0.1 2.3 1.9 2.7 2.1 2-1.3 0.4-1.2 0.9-1.9 2 2.3 1 2.8 0.3 5.7-0.1 0 1-2.3 1.5-2.8 1.2-2.4 1.6-1.1 2.8-0.6 0.7-3.7 2.1-0.7 1.2-0.8 2.9-0.6 1.3-5-2.5-2.6-0.2-1.2 2.1 0.7 1.3 2.5 3.1-0.4 0.7-5.1 2.5-0.9 0.2-0.6 0.8-3.7 1.9-0.8 1.3-3.4 11-1.5 2.8-1.9 2.5-1.1 0-4.4-9.1-13.2-17.9 0-0.1z m15.4-59.9l1.6 0.3 0.9 0.8 1.2 0.3 1.7 0 0 1-1.9 0.7-2.4 0.6-2.7 0.2-2.7-0.3-2.7-1.2-1.5-1.4-2.2-4.1 3-1 1.3-0.1 5.1 0.9 4.6 1.4 0 1.1-5.4 0 1.5 0.8 0.6 0z m-310.6 730.4l-2.9 0.1 2-3.5 1.9-1.5 2.2-1.3 2.2-0.4 0 1.6-0.1 2-2.1 2.3-3.2 0.7z m505.6-507.7l2-1 2.3-0.1-0.2 1.9-1.2 0.5-2-0.4-0.9-0.9z" id="CRP" name="Puntarenas">  </path>
+                        <path d="M601.1 246.6l-0.3-1.4 0-0.8 0-0.5 0.1-0.5 0.8-1.2 2.9-3.1 0-0.4 1.9-24.3 0.2-22 0.3-18.4 0.3-25.8 0.4-34.3 0-0.7 1.4 0.2 1.9-0.3 3 2.9 1.8 0.7 1.8-1.4 1.1 0 1.9 1.9 3.9-2.5 2.7 0.6 1.9-1.9 2.1-0.3 1.7 1.2 0.8 2.7 9.5 7.6 1 0.5 1.5 0.2 1.6-0.3 2.2-1.6 1-0.3 4.3 0.9 0.6-0.4 3.2-3.8 10.5-4 0.8-0.2 0.5 0.4 1.8 0.5 0.5 0.2 0.4 0.2 0.4 0.3 0.7 0.8 0.6 0.7 0.5 0.7 0.1 0.6 0 0.5-0.5 3.3 0.1 0.7 0.1 0.6 0.5 0.6 0.5 0.6 0.7 0.5 1.3 0.8 0.6 0.5 0.4 0.5 0.3 0.5 0 0.3-0.1 0.1-0.7-0.2-0.6-0.1-0.6 0-1.7 0.5-4.6 0.4-0.9 0.2-1.6 0.5-2.7 1.7-1.6 1.8-0.6 0.4-1.5 0.8-1.4 0.9-0.6 0.5-0.2 0.3-0.3 1-0.2 1.4-0.2 4.9 0.1 1.5-0.9 6.9 0 1 0.2 0.3 0.2 0.4 0.5 0.6 0.2 0.3 0.2 0.4 0.1 0.4-0.1 0.6-0.1 1.3 0 0.5 0.1 0.5 0.7 1.6 0 0.4 0 0.8-0.9 3.4-1.4 2.2-0.6 0.6-0.3 0.3-0.4 0.2-0.4 0.1-0.4 0-0.4 0.2-0.3 0.4-1.3 2.4-0.4 0.7-0.6 1.1-0.1 0.7-0.1 1 0.4 2.3 0.2 0.6 2.1 4 0.5 1.7 0.3 0.8 0.4 0.7 0.5 0.6 0.1 0.3 0.1 0.8-0.2 1.2-0.5 2.3-0.1 1.9 0.1 0.5-0.2 0.8-0.4 1.2-2 4.1-0.5 0.8-7.4 8-5.8 0.6-3.1 4-1 1-0.7 0.2-3.5 0.3-3.1 0.6-6.9 0.6-0.8 0.3 0.1 0.8 0.6 1.3 3.6 5.4 2.1 2.2 0.4 1.3 0.2 3.9 1.3 1.4 0.8 0.6 0.5 0.6 0.2 1.2-1 3.2-2 5.3-3 1.8-4.2 1.4-1.6 0.3-4.1-0.4-0.7 0.1-5.8 2.6-1.8-0.8-3.1-1.5-2.8 0.4z" id="CRH" name="Heredia">  </path>
+                        <path d="M542.5 267.9l1.1 0 0.3-0.3 0.2-1.2 0.3-0.6 2.9-3.7 0.1-0.5-0.1-0.4 0.5-0.6 1-0.8 2.7-1.4 1.9-1.8 0.2-0.4 0.1-0.2 1.3-0.8 4.9-2.2 7-0.5 3.8-0.8 3.1 0.9 3.1 0.5 0.6 0.2 0.8 0.2 1.9 0.2 0.8 0.3 2.8-0.4 10.6-3 4.4-1.4 2.3-2.6 2.8-0.4 3.1 1.5 1.8 0.8 5.8-2.6 0.7-0.1 4.1 0.4 1.6-0.3 4.2-1.4 3-1.8 2-5.3 1-3.2-0.2-1.2-0.5-0.6-0.8-0.6-1.3-1.4-0.2-3.9-0.4-1.3-2.1-2.2-3.6-5.4-0.6-1.3-0.1-0.8 0.8-0.3 6.9-0.6 3.1-0.6 3.5-0.3 0.7-0.2 1-1 3.1-4 5.8-0.6-1.4 1.4-1.1 1.4-2.1 7.2 2.2 7.7 0.4 0.6 0.6 0.7 1.3 1.3 1.4 0.9 0.7 0.4 0.3 0.2 3.2 3.6 0.6 0.9 0.4 1.4 0.3 4.2 0.7 3.5-0.3 1.3-0.5 0.7-0.6 0.5-0.9 0.3-1.9 0.2-2 2.2-0.5 0.2-0.6 0.1-0.5-0.1-0.3-0.2-1.5-0.3-4.1 0.1-0.2 0.1-7.2 2.6-4.2 6.9-0.3 1.3 0.3 0.2 0.6 0.3 3.1 1.4-4.5 7.4-1.2 1.3-1.9 1.3-2.8 2.6-1.1 1.7-0.5 1-0.1 0.7 0 0.5 0.1 0.5 0.2 0.4 0.2 0.3 0.4 0.2 0.4 0 0.5-0.1 1.9-0.7 1.3-0.4 0.4 0 1 0.1 0.9 0.2 5.8-1.3 1.3 0.2 0.4 1.5 0.3 0.8 0.3 0.8 1 2 3.1 1 0.8 0.7 0.1 0.4 0.1 0.3 1.4 2.4 3.5 4.6 0.8 0.7 0.5 0.1 1.9 0.7 3.2 1.6 0.8 0.2 0.4-0.1 0.4-0.2 0.4-0.2 0.7-0.1 1.2 0.1 0.7 0.2 0.4 0.3 0.3 0.3 1.2 2 1.1 2.3 0.1 0.4 0.3 0.7 0.6 1.3 0.8 1.3 0.6 0.6 0.4 0.4 0.5 0.1 3.4 0.7 0.8 0 3-0.3 1.8 2.4 0.4 0.4 0.8 0.5 2.4 0.8 0.7 0.4 0.4 0.4 0.2 0.4 0.5 1.7 0.3 2.1 0.3 0.3 0.3 0 2.2-1.1 0.8-0.3 0.4-0.1 1.9 0.2 0.5 0 0.5-0.1 0.4-0.1 0.4-0.1 0.4-0.2 0.3-0.2 0.3-0.3 0.2-0.3 0.8-1.4 0.6-0.7 1.9-0.6 4 4.2 1.4 1.2 1.5 0.7 0.4 0.2 16.7 10.1 5.2 14.4 1.3 1.9 0.6 0.5 1.9 1.4-3.4 3.6-0.4 0.6-0.5 0.9-1.1 3.9-0.4 0.9-0.3 0.6-4.3 4.9-0.6 0.8-0.1 0.4-1.5 8 0 0.5 0.2 0.3 0.3 0.2 1.4 0.3 0.4 0.1 0.3 0.3 0.2 0.3 0.3 0.2 0.4 0.1 0.4 0 0.4 0 0.4 0 0.3 0.2 0.2 0.3 0.1 0.5 0.2 0.3 0.2 0.6 0.2 0.9 0.1 1.9-0.3 1-1.2 2.2-0.3 0.9-0.1 0.6 0.5 3.7-0.1 0.8-0.2 0.6-0.3 0.3-0.4 0.2-0.3 0.2-0.5 0.3-0.6 0.6-1.7 2.4-0.3 0.2-0.3 0.2-0.3 0.2-0.5 0-0.4-0.1-0.4-0.1-0.7-0.4-0.3-0.3-0.7-0.8-0.7-0.5-0.4-0.2-0.5-0.1-0.4 0.1-1.4 0.2-1.7 0.1-0.3-0.2-14.4-9.3-1-1.3-0.5-0.6-0.1-0.3-1.2-4.2-0.1-0.4-0.1-0.4-0.5-1-3.6-4.4-2.2-2.1-1.5-0.8-0.5-0.1-0.4 0-0.4 0-0.5 0-0.5 0.1-0.4 0.2-0.4 0.2-0.3 0.2-1.4 2-0.2 0.3-0.3 0.2-0.4 0.1-0.5 0.1-1.1-0.3-7.9-3.6-1.1-1-0.6-0.6-0.4-0.7-0.7-1.5-1.1-3.2-0.2-1.8 0-1 0.2-1.6-0.6-1-1-1.4-5.1-5.2-0.2-0.4-0.7-3-0.2-0.7-1.1-2-0.6-0.6-0.5-0.3-0.4-0.1-0.5 0-0.4 0-0.4 0.2-0.4 0.1-0.3 0.3-0.3 0.2-0.3 0.3-0.2 0.4-2.4-0.8-10.4-6.9-3.6-3.6-2.5-4.9-3.5-1.6-0.6-1 0.4-0.8 0.4-0.7 0.1-0.7 0-1-0.3-2-0.3-0.8-0.4-0.6-0.4-0.3-0.8-0.3-1.4-0.2-2.1 0.1-1.4 0.2-0.7-0.1-1.3-0.5-1.2-1.1-0.5-0.6-0.3-0.6 0-0.5 0.1-1 0.3-1.4 0-0.6 0-0.7-0.4-1.3-0.4-0.7-0.5-0.4-0.4-0.2-1.4-0.1-7.1 0.6-2.3-0.2-2.1-0.9-5.6 0.2-1.7-0.3-0.2-0.3-1.1-1.3-0.6-0.5-0.9-0.7-2.3-0.2-6.7 0.3-4.2 0.8-1.8 0-0.9 0.2-0.4 0.2 0 0.4 0.5 3.2-0.1 1-0.1 0.4-0.4 0.4-0.5 0.6-1.8 1.4-0.4 0.4-0.3 0.4-0.9 1.9-0.5 0.4-0.4 0.2-0.5 0.1-0.4-0.1-0.4-0.1-0.4-0.2-0.3-0.3-0.7-0.8-0.4-0.2-0.3-0.2-0.5-0.1-0.5 0-2.5 0.7-0.6 0-0.4-0.1-1.1-0.4-4.9 0.8-1.6-0.2-0.5-0.4-1.1-1-1-1.3-0.7-1.5-0.4-1.2-1.1-5.4-0.1-0.3-3.5-6.2-0.4-0.9 0-0.5 0.1-3.1-0.4-2-1.2-4-0.1-0.4 0.1-0.5 0.1-0.3 0.2-0.4 0.3-0.2 0.4-0.2 0.4-0.2 1-0.1 3 0.2 0.5-0.1 0.4-0.1 0.4-0.1 0.3-0.3 0.3-0.4 0.3-0.6 0.2-1.3-0.1-0.9-0.1-0.6-0.8-1.5-0.9-1.3-0.3-0.3-0.5-0.5-0.7-0.5-1.1-0.7-1.5-0.6 1.4-1.2z" id="CRSJ" name="San José">  </path>
+                        <path d="M641.7 217.9l19.8 9 6.9 3.3 9.5 4.5 15.5 7.2 4.1 1.5 22.8 0.2 16.7 0.4 3.2 0.7-0.4 0.6-2 2.8-1.2 2.7-0.5 2.8 0.2 3.5 1.8 5.7 0.4 2.9-1 2.8-6.7 8.4-4.8 5.8-1.3 2-3.5 9-9.1 11-2.2 4.5-0.6 4.9 0.4 1.6 0.3 1.9 0.9 2.2 0.3 0.4 0.5 0.6 0.4 0.4 1 2.2 0.6 1.7-16.7-10.1-0.4-0.2-1.5-0.7-1.4-1.2-4-4.2-1.9 0.6-0.6 0.7-0.8 1.4-0.2 0.3-0.3 0.3-0.3 0.2-0.4 0.2-0.4 0.1-0.4 0.1-0.5 0.1-0.5 0-1.9-0.2-0.4 0.1-0.8 0.3-2.2 1.1-0.3 0-0.3-0.3-0.3-2.1-0.5-1.7-0.2-0.4-0.4-0.4-0.7-0.4-2.4-0.8-0.8-0.5-0.4-0.4-1.8-2.4-3 0.3-0.8 0-3.4-0.7-0.5-0.1-0.4-0.4-0.6-0.6-0.8-1.3-0.6-1.3-0.3-0.7-0.1-0.4-1.1-2.3-1.2-2-0.3-0.3-0.4-0.3-0.7-0.2-1.2-0.1-0.7 0.1-0.4 0.2-0.4 0.2-0.4 0.1-0.8-0.2-3.2-1.6-1.9-0.7-0.5-0.1-0.8-0.7-3.5-4.6-1.4-2.4-0.1-0.3-0.1-0.4-0.8-0.7-3.1-1-1-2-0.3-0.8-0.3-0.8-0.4-1.5-1.3-0.2-5.8 1.3-0.9-0.2-1-0.1-0.4 0-1.3 0.4-1.9 0.7-0.5 0.1-0.4 0-0.4-0.2-0.2-0.3-0.2-0.4-0.1-0.5 0-0.5 0.1-0.7 0.5-1 1.1-1.7 2.8-2.6 1.9-1.3 1.2-1.3 4.5-7.4-3.1-1.4-0.6-0.3-0.3-0.2 0.3-1.3 4.2-6.9 7.2-2.6 0.2-0.1 4.1-0.1 1.5 0.3 0.3 0.2 0.5 0.1 0.6-0.1 0.5-0.2 2-2.2 1.9-0.2 0.9-0.3 0.6-0.5 0.5-0.7 0.3-1.3-0.7-3.5-0.3-4.2-0.4-1.4-0.6-0.9-3.2-3.6-0.3-0.2-0.7-0.4-1.4-0.9-1.3-1.3-0.6-0.7-0.4-0.6-2.2-7.7z" id="CRC" name="Cartago">  </path>
+                    </g>
+                    <g id="points">
+                        <circle class="5.79982485978829|-86.88992375414269" cx="176.4" cy="909.4" id="orig-point-0">  </circle>
+                        <circle class="8.077766816706248|-84.61250960794341" cx="536" cy="547.1" id="orig-point-1">  </circle>
+                        <circle class="10.925194262853694|-82.79057829098399" cx="823.6" cy="91.3" id="orig-point-2">  </circle>
+                    </g>
+                    <g id="label_points">
+                        <circle class="Alajuela" cx="554.5" cy="139.5" id="CRA-label">  </circle>
+                        <circle class="Guanacaste" cx="412.8" cy="157.5" id="CRG-label">  </circle>
+                        <circle class="Limón" cx="765.7" cy="299" id="CRL-label">  </circle>
+                        <circle class="Puntarenas" cx="749.6" cy="401" id="CRP-label">  </circle>
+                        <circle class="Heredia" cx="630.2" cy="171.1" id="CRH-label">  </circle>
+                        <circle class="San José" cx="596" cy="275.5" id="CRSJ-label">  </circle>
+                        <circle class="Cartago" cx="682" cy="271.8" id="CRC-label">  </circle>
+                    </g>
+
+                    <g id="ecosystem-markers-group"></g>
+                    <g id="ecosystem-labels-group"></g>
+                    <g id="location-markers-group"></g>
+                    <g id="ecosystem-description-group"></g>
+                </svg>
+            </div>
+            <div id="info-panel-container" class="info-panel-container">
+                <div id="info-panel" class="info-panel">
+                    <h3></h3>
+                    <p></p>
+                </div>
+            </div>
+            <button id="panel-toggle-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <div class="lang-switcher">
+                <button id="lang-es" class="active">ES</button>
+                <button id="lang-en">EN</button>
+            </div>
+            <div id="ecosystem-navigator" class="ecosystem-navigator"></div>
+            <button id="toggle-all-btn" class="map-action-button">Show All</button>
+        </div>
+        <div id="image-preloader" style="display: none;"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const ecosystemsData = [
+                { id: "ocean-playground", name: "Ocean Playground", color: "#0077b6", initial: { cx: 367.2, cy: 146.2, r: 10 }, open: { cx: 250.6, cy: 142.6, r: 55 }, zoomView: { x: 153.7, y: -3.0, width: 263.7, height: 338.9 }, imageUrl: "Imagenes/Ocean Playground.png", labelPosition: { x: 250.6, y: 215 }, desc_es: "La costa del Golfo de Papagayo, repleta de bahías escondidas, playas vírgenes e islas escarpadas, es uno de los destinos oceánicos más accesibles de Costa Rica. Ideal para aventuras en el Pacífico. Sumérgete en aguas cristalinas y tranquilas, ricas en vida marina para descubrir una gama de actividades oceánicas. Explora a lo largo de la costa, descubriendo las bahías ocultas y arenas cálidas para relajarse en ellas, aprenda a surfear con suaves olas o aventúrese a explorar con remo las caletas rocosas. La aventura continúa en tierra, con lujosos picnics en playas vírgenes y la posibilidad de ascender majestuosos árboles en un bosque seco tropical salvaje, vibrante de aves exóticas y fascinante vida silvestre.", desc_en: "A stretch of coastline studded with secluded bays, deserted beaches and rugged islands, the Gulf of Papagayo, as one of Costa Rica’s most accessible ocean destinations, is the perfect Pacific playground. Plunge headlong into iridescent waters that are calm, clear and abundant in marine life, to discover an endless array of ocean activities. Voyage along the coast, discovering hidden bays and stretches of warm sand to relax on, learn to surf on gentle swells or venture out using paddle power to explore rocky inlets. The adventures continue on land where there are beach picnics to be had and towering trees to climb in untamed tropical dry forest that teems with bird and animal life.", locations: [ { name: "Papagayo", cx: 371.2, cy: 104.9 }, { name: "Coco/Hermosa", cx: 378.4, cy: 137.6 }, { name: "La Cruz", cx: 378.1, cy: 67.4 }, { name: "Santa Elena", cx: 375.6, cy: 85.5 }, { name: "Bat Islands", cx: 318.8, cy: 96.1 }, { name: "Las Catalinas", cx: 354.9, cy: 163.5 }, { name: "Tamarindo", cx: 346.7, cy: 187.8 }, { name: "Cabuyal", cx: 375, cy: 120.1 } ] },
+                { id: "land-of-fire", name: "Land of Fire", color: "#d62828", initial: { cx: 505.9, cy: 110.7, r: 10 }, open: { cx: 455.6, cy: -46.5, r: 55 }, zoomView: { x: 270.8, y: -111.8, width: 295.7, height: 380.2 }, imageUrl: "Imagenes/Land of Fire.png", labelPosition: { x: 455.6, y: 30 }, desc_es: "Donde los volcanes dominan el horizonte, las comunidades locales reciben con calidez genuina y los sabaneros guían su ganado entre colinas onduladas, se esconde un rincón inexplorado de la Costa Rica rural que ofrece una auténtica experiencia de vida campestre. En este paraíso verde, donde brotan en abundancia todos los matices imaginables de un suelo rico en minerales, hay un mundo por descubrir. En las laderas boscosas del majestuoso Volcán Tenorio —compartidas únicamente con la fauna que las habita—, tesoros ocultos esperan bajo el dosel selvático. Atrévete a explorar este santuario natural y déjate maravillar por los regalos de los volcanes: ríos impetuosos, cataratas imponentes, aguas termales burbujeantes y piscinas de tonos azules únicos. Todo mientras cruzas caminos con criaturas encantadoras como osos hormigueros, pumas y tapires.", desc_en: "Where volcanoes dominate the skyline, local communities offer the warmest of welcomes and cowboys herd cattle through the rolling hills, is an undiscovered corner of rural Costa Rica that offers an authentic slice of country life. Here, among every conceivable shade of green bursting abundantly from the mineral rich soil, there is so much to be explored. On the forested slopes of Tenorio Volcano, which you’ll share only with the wildlife that calls them home, hidden treasures wait beneath the canopy. Venture into the wilderness to uncover the gifts from the surrounding volcanoes – rushing rivers, tumbling waterfalls, bubbling hot springs and pools in ethereal shades of blue - and to spot charming creatures like anteaters, pumas and tapirs.", locations: [ { name: "Bijagua", cx: 494.5, cy: 108 }, { name: "Upala", cx: 477.6, cy: 93 }, { name: "Buenos Aires", cx: 437.2, cy: 101.5 }, { name: "Rincon de la Vieja", cx: 447.1, cy: 118.4 }, { name: "Tenorio", cx: 478.5, cy: 133.8 }, { name: "Bagaces", cx: 441, cy: 145.6 }, { name: "Guatuso", cx: 496.3, cy: 156.9 } ] },
+                { id: "green-haven", name: "Green Haven", color: "#8ac926", initial: { cx: 542.8, cy: 166.2, r: 10 }, open: { cx: 599.2, cy: -7.7, r: 55 }, zoomView: { x: 350.6, y: -108.7, width: 301.8, height: 388.0 }, imageUrl: "Imagenes/Green Haven.png", labelPosition: { x: 505, y: -10 }, desc_es: "La imponente figura del Volcán Arenal domina el horizonte a kilómetros de distancia, mientras una sinfonía de verdes radiantes y multicolores descienden por sus laderas. De su suelo fértil, nutrido por siglos de quietud volcánica, brota un bosque vibrante de vida que es sólo una parte de la escarpada belleza del paisaje creado por siglos de sus turbulencias. Este paraíso natural invita a ser explorado a través de experiencias emocionantes. Puedes recorrer senderos marcados por antiguas coladas de lava o caminar por elevados puentes a gran altura del bosque, donde la fauna silvestre se desliza entre las copas de los árboles. Sea cual sea el camino que elijas, Arenal revelará su esencia más extraordinaria y usted será el más afortunado por haberlo experimentado.", desc_en: "The magnificent peak of Volcano Arenal dominates the horizon for miles around, a swath of radiant, multi-hued greens sweeping down its slopes. Springing from the bountiful soil given by the slumbering volcano, the life-filled forest is just a part of the rugged beauty of the landscape created by centuries of its turbulence. The nature here waits to be explored, and it can be in an array of thrilling ways. Wander trails cut through the trees by old lava flows or clamber walkways high above the forest floor where wildlife flits through the canopy, to name just two. Whichever adventure you choose, Arenal will share its extraordinary nature with you and you will be all the better for experiencing it.", locations: [ { name: "Arenal", cx: 536.4, cy: 170.2 } ] },
+                { id: "mystic-mountains", name: "Mystic Mountains", color: "#6a4c93", initial: { cx: 499, cy: 202, r: 10 }, open: { cx: 313.1, cy: -8.9, r: 55 }, zoomView: { x: 225.6, y: -81.0, width: 310.6, height: 399.2 }, imageUrl: "Imagenes/Mystic Mountains.png", labelPosition: { x: 313.1, y: 60 }, desc_es: "Formando un manto denso, verde y místico sobre las laderas y cumbres de la Cordillera de Tilarán, el bosque nuboso de Monteverde es un lugar mágico. Casi siempre rodeado de neblina y con un ambiente perfecto, en sus biomas únicos y abundantes vive el 2,5% de la biodiversidad mundial, acompañado de un concierto natural de cantos de aves, zumbidos de insectos y el eco de la selva húmeda. Este es un lugar que clama por ser explorado, ya sea a pie o por medios más emocionantes. Simplemente dejarse llevar y recorrerlo sin prisa es, sin duda, imprescindible. Entre su bella y atmosférica naturaleza encontrará misteriosos árboles retorcidos cubiertos de líquenes, musgo y helechos y, si la suerte le acompaña, podrás encontrar los animales silvestres más elusivos de Costa Rica, como perezosos, quetzales, jaguares y pumas.", desc_en: "Forming a dense, green, undulating blanket over the slopes and peaks on the Cordillera de Tilaran, the cloud forest of Monteverde is a magical place. Almost constantly fog-bound and perfectly moody, within its unique, abundant biomes live 2.5% of the world’s biodiversity, the soundtrack of birdsong, buzzing insects and the calls of the rainforest residents a constant. This is a place crying out to be explored be it on foot or by some more thrilling means. Simply wandering, though, is a must. Among it’s beautiful, atmospheric nature you’ll find mysterious twisted trees draped in lichens, moss and ferns and, if luck is on your side, encounter some of Costa Rica’s most elusive creatures, like sloths, quetzals, jaguars and pumas.", locations: [ { name: "Monteverde", cx: 498.9, cy: 195.5 } ] },
+                { id: "enchanting-coast", name: "Enchanting Coast", color: "#f4a261", initial: { cx: 609, cy: 334.7, r: 10 }, open: { cx: 589.5, cy: 433.4, r: 55 }, zoomView: { x: 401.8, y: 186.7, width: 310.1, height: 397.0 }, imageUrl: "Imagenes/Enchanting Coast.png", labelPosition: { x: 589.5, y: 510 }, desc_es: "Una tierra impregnada de magia. Playas doradas, naturaleza dichosa, vegetación vibrante, arrecifes de coral, olas surfeables: la costa encantadora puede explorarse tanto a un ritmo pausado como con espíritu aventurero. Aquí, puedes sentir la intensidad en los huesos, en el espesor del aire, en los llamados de tucanes y monos. Ya sea explorando la naturaleza salvaje de Manuel Antonio, donde senderos serpenteantes atraviesan una selva abundante, o disfrutando de largas extensiones de playas vírgenes que ofrecen tanto cálidas arenas para relajarse como actividades llenas de adrenalina, hay mucho aquí que te robará el corazón y calmará tu alma.", desc_en: "Where rainforested hills touch the turquoise waters of the Pacific Ocean, you’ll find a land imbued with magic. Golden beaches, blissful nature, vibrant vegetation, coral reefs, surfable swells - the enchanting coast can be explored at either a languid pace or with adventure in mind. Here, you can feel the intensity in your bones, in the thickness of the air, through the calls of toucans and monkeys. Whether you explore the wilderness of Manual Antonio, where meandering trails wind through abundant rainforest, or find yourself on the long stretch of pristine beaches which provide both warm sands to relax on and adrenaline-fuelled activities, there is plenty here to steal your heart and still your soul.", locations: [ { name: "Manuel Antonio", cx: 609.2, cy: 333.7 }, { name: "Jaco", cx: 532.2, cy: 293.3 }, { name: "Puntarenas", cx: 517.5, cy: 249.3 }, { name: "Uvita / Dominical", cx: 659.4, cy: 359.4 } ] },
+                { id: "surf-vibes", name: "Surf Vibes", color: "#e9c46a", initial: { cx: 461.2, cy: 283.5, r: 10 }, open: { cx: 426.4, cy: 399, r: 55 }, zoomView: { x: 331.5, y: 178.0, width: 266.0, height: 341.9 }, imageUrl: "Imagenes/Surf Vibes.png", labelPosition: { x: 530, y: 400 }, desc_es: "El encantador y remoto pueblo costero de Santa Teresa tiene un aire propio: relajado, chic y con una calma natural que enamora. Cautiva a quienes lo visitan con su combinación impecable de olas perfectas, sol radiante y su estilo pura vida. Rodeado de naturaleza salvaje, arenas blancas y playas abrazadas por el bosque, este santuario tropical es un imán para surfistas y amantes del yoga, pero también para quienes buscan reconectar consigo mismos en un entorno de belleza pura, buena vibra y lujo descalzo. Dedica tus días a encontrar tu equilibrio interior con experiencias memorables frente al océano, y al atardecer, elige tu lugar en la arena tibia para contemplar uno de los espectáculos más sublimes: el atardecer. Por la noche, explora la vibrante escena gastronómica y la vida nocturna junto al mar, siempre acompañados por la melodía natural de las olas.", desc_en: "The perfectly remote beach town of Santa Teresa has an air of its very own; relaxed, chic and mellow, it draws people in with its flawless combination of waves, sunshine and pura vida. Surrounded by wild nature, white sands and forest-backed beaches, it is a mecca for surfers and yogis but has something for everyone looking to reconnect with themselves in a place of pure beauty, good vibes and barefoot luxury. Spend your days refining your zen in any number of wonderful ways against an ocean backdrop before finding a spot on the sun-warmed sand to enjoy the epic sunsets. Evenings are for exploring the easy-going beachfront restaurant and nightlife scene, soundtracked by the sounds of the sea.", locations: [ { name: "Santa Teresa", cx: 443.9, cy: 285.3 }, { name: "Malpais", cx: 450.4, cy: 301.6 }, { name: "Cabo Blanco", cx: 459.1, cy: 316.9 }, { name: "Curu", cx: 490.2, cy: 269.5 } ] },
+                { id: "barefoot-tranquility", name: "Barefoot Tranquility", color: "#2a9d8f", initial: { cx: 386.9, cy: 259.9, r: 10 }, open: { cx: 297.8, cy: 304.9, r: 55 }, zoomView: { x: 190.1, y: 160.7, width: 251.4, height: 323.1 }, imageUrl: "Imagenes/Barefoot Tranquility.png", labelPosition: { x: 297.8, y: 385 }, desc_es: "Relajado y sereno, el encantador pueblo de Nosara es un imán para yoguis, familias, amantes de la naturaleza y surfistas. Con una vibra constante de “pasarlo bien todo el tiempo”, su ubicación en una costa virgen y su reconocida escena gastronómica son solo algunas de las muchas razones para enamorarse, explorar y regresar. No es casualidad que Nosara forme parte de una de las cinco “Zonas Azules” del mundo, donde las personas viven con plenitud hasta los 100 años. Ya sea que vengas a reconectar contigo mismo —sobre un mat de yoga, una tabla de surf o rodeado de naturaleza prístina—, a saborear deliciosa comida, contemplar atardeceres espectaculares o agotar a los niños entre paisajes de ensueño, aquí siempre habrá más por descubrir para mantenerte feliz, saludable y explorando.", desc_en: "Relaxed and peaceful, the town of Nosara is a beacon for yogis, families, nature lovers and surfers. Exuding a ‘good time, all the time’ vibe, it’s setting on an unspoiled coastline and foodie reputation are just two items on a long tick list of things to love, do and explore. No wonder Nosara is in one of the world’s five ‘Blue Zones’ where people regularly live to 100 years old. Whether you come here to centre yourself – physically on a yoga mat or surf board, or mentally among pristine nature – to eat delicious food, enjoy beautiful sunsets or wear out the kids in spectacular landscapes, you’ll find there is  always so much more to keep you happy, healthy and exploring.", locations: [ { name: "Nosara", cx: 370.2, cy: 237.8 }, { name: "Samara", cx: 382.2, cy: 253.1 }, { name: "Carrillo", cx: 406.2, cy: 263.5 } ] },
+                { id: "nature-s-coast", name: "Nature's Coast", color: "#80ed99", initial: { cx: 709.3, cy: 149.5, r: 10 }, open: { cx: 741.8, cy: 39.3, r: 55 }, zoomView: { x: 566.0, y: -64.4, width: 291.0, height: 374.0 }, imageUrl: "Imagenes/Natures Coast.png", labelPosition: { x: 850, y: 30 }, desc_es: "Aislado sobre un banco de arena en las tranquilas aguas del Caribe, Tortuguero es un paraíso perdido de mares cálidos, arenas tranquilas y exuberante vegetación. Aquí, la naturaleza reina supremamente, desplegándose a través de canales de agua dulce que serpentean entre densos bosques tropicales donde se refugia una gloriosa variedad de fauna salvaje. Considerado uno de los grandes tesoros de biodiversidad de Costa Rica, aventurarse en Tortuguero es garantía de una experiencia inolvidable. Ya sea explorando la selva o flotando por los canales de agua entre los árboles puede llevarle a ver perezosos, iguanas, cocodrilos y tucanes. En la época adecuada del año es posible ser testigo de un ritual milenario, mientras cuatro especies diferentes de tortugas llegan a las playas para desovar.", desc_en: "Stranded on a sandbar island in the calm waters of the Caribbean, Tortuguero is a castaway paradise of warm seas, peaceful sands and abundant greenery. Here, nature reigns supreme, traversed by fresh water canals that snake through dense tropical forests where a glorious array of wildlife shelter. Another of Costa Rica’s biodiversity hotspots, venturing into Tortuguero guarantees an adventure. Roaming the forest floor or floating down the web of waterways through the trees may lead you to sloths, iguanas, crocodiles and toucans. At the right time of year you can bear witness to a ritual that has survived millennia, as four different species of turtle lumber up onto the beaches to lay their eggs.", locations: [ { name: "Tortuguero", cx: 709.6, cy: 145.9 } ] },
+                { id: "mellow-coast", name: "Mellow Coast", color: "#ff595e", initial: { cx: 817.4, cy: 279.5, r: 10 }, open: { cx: 926.4, cy: 270.2, r: 55 }, zoomView: { x: 642.6, y: 173.8, width: 285.9, height: 367.5 }, imageUrl: "Imagenes/Mellow Coast.png", labelPosition: { x: 926.4, y: 350 }, desc_es: "Maravillosamente remota, auténticamente salvaje y sorprendentemente poco conocida, esta espléndida franja de costa caribeña tiene un ambiente único. Descubre la cultura, tanto indígena como afro-costarricense, y experimenta la naturaleza en estado puro. La densa jungla y los manglares ofrecen experiencias intrépidas llenas de vida animal y aves, mientras que los mares brindan el mejor surf de la costa este. En su corazón está Puerto Viejo, un pueblo costero donde lo animado y lo relajado se combinan a la perfección, con el aire lleno de ritmos de reggae y el aroma de la cocina criolla. Ven aquí por sus arenas doradas de salvaje belleza, las aguas cristalinas, el espectacular surf, para escapar del bullicio; ven aquí para descubrir una cara diferente de Costa Rica, y encontrará mucho más.", desc_en: "Wonderfully remote, truly wild and surprisingly under-the-radar, this glorious stretch of Caribbean coast has a vibe of its very own. Find culture – both indigenous and Afro-Costa Rican – and experience pure nature, the dense jungle and mangroves offering intrepid excursions filled with animal and bird-life, the seas bringing the east coast’s best surfing. At its heart is Puerto Viejo, a seaside town where lively and laidback combine to perfection, the air full of reggae beats and the scent of Creole cuisine. Come here for golden sands that are wildly beautiful, the clear blue waters, for spectacular surfing, to escape hectic; come here for a different side of Costa Rica, and find a whole lot more.", locations: [ { name: "Puerto Viejo", cx: 822.1, cy: 292.1 }, { name: "Cahuita", cx: 808.1, cy: 274.4 } ] },
+                { id: "wildlife-hotspot", name: "Wildlife Hotspot", color: "#e76f51", initial: { cx: 704.7, cy: 466.5, r: 10 }, open: { cx: 725.8, cy: 569.3, r: 55 }, zoomView: { x: 517.4, y: 310.1, width: 298.0, height: 383.1 }, imageUrl: "Imagenes/Wildlife Hotspot.png", labelPosition: { x: 620, y: 555 }, desc_es: "En la Península de Osa, uno de los lugares con mayor biodiversidad del planeta, la naturaleza se muestra en su forma más intensa e impresionante. Aquí, vastas extensiones de selva permanecen salvajes y remotas, albergando una asombrosa variedad de vida silvestre. Explorarla, recorriendo senderos poco transitados entre árboles imponentes, es una experiencia envolvente. Allí donde el bosque y el Océano Pacífico se encuentran, descubrirás la emoción del surf salvaje y la tranquilidad del Golfo Dulce, donde las aguas esconden un mundo lleno de vida. Te esperan encuentros mágicos a cada paso, ya sea por tierra o por el mar. Prepárate para que tus sentidos se despierten, moldeados por la fuerza vital de este entorno prístino, y para no solo abrazar el espíritu de la aventura, sino convertirte en él.", desc_en: "On the Osa Peninsula, one of the most biodiverse places on the planet, nature is at its most intense and awe-inspiring. Here, vast tracts of rainforest remain wild and remote, sheltering an astounding array of wildlife. Exploring it, winding through the towering trees on seldom-trodden trails, is an all-encompassing experience. Then, where the forest and the Pacific Ocean collide, you’ll find the exhilaration of wild surf and the tranquillity of the Golfo Dulce where water hides another world of rich life. Magical encounters await at every turn, be it land or sea. Prepare for your senses to be reawakened, to be shaped by the very lifeforce of this pristine environment and to not just embrace the spirit of adventure but become it.", locations: [ { name: "Drake", cx: 688.1, cy: 442.1 }, { name: "Sierpe", cx: 717.2, cy: 420.5 }, { name: "Golfito", cx: 772.4, cy: 457.6 }, { name: "Puerto Jimenez", cx: 743.6, "cy": 472.5 }, { "name": "Corcovado", "cx": 696.9, "cy": 483 } ] },
+                { id: "countryside", name: "Countryside", color: "#ffca3a", initial: { cx: 679.9, cy: 245, r: 10 }, open: { cx: 818.3, cy: 166, r: 55 }, zoomView: { x: 551.3, y: 60.1, width: 285.2, height: 366.6 }, imageUrl: "Imagenes/Countryside.png", labelPosition: { x: 818.3, y: 90 }, desc_es: "El exuberante Valle Central es un mosaico pintoresco de plantaciones de café, campos de caña de azúcar y tierras agrícolas. Bajo la atenta mirada del imponente Volcán Turrialba, el paisaje está rodeado de pueblos rurales – siendo el lugar ideal para perderse en escenas encantadoras de la vida diaria y, como tierras ancestrales del pueblo indígena Cabécar, descubrir una cultura milenaria. Por las mañanas, la refrescante neblina y las tazas de café cultivado localmente traen paz al alma y generan una sensación de anticipación. Con una riqueza de experiencias, desde aventuras extremas como el rafting hasta encuentros culturales como visitas a comunidades indígenas, el clima más fresco ofrece las condiciones perfectas para explorar.", desc_en: "The lush Central Valley is a picturesque patchwork of coffee plantations, sugarcane fields and farmland. Watched over by the mighty Turrialba Volcano, the landscape is dotted with rural villages - there is no better place to lose yourself in enchanting scenes of daily life and, as the ancestral lands of the indigenous Cabécar people, an age-old culture. In the mornings, the bracing morning mist and cups of locally grown coffee bring peace to the soul and builds a sense of anticipation; with a wealth of experiences, from all-out adventures like white water rafting to cultural encounters, like indigenous community visits, to immerse yourself in, the cooler climate provides the perfect conditions for exploring.", locations: [ { name: "Turrialba", cx: 686.4, cy: 252.1 }, { name: "Altagracia", cx: 701.7, cy: 330.8 }, { name: "Guapiles", cx: 660.7, cy: 210.1 } ] },
+                { id: "capital", name: "Capital", color: "#1982c4", initial: { cx: 624.5, cy: 248.4, r: 10 }, open: { cx: 900.7, cy: 439.6, r: 55 }, zoomView: { x: 390.2, y: 43.3, width: 392.0, height: 503.9 }, imageUrl: "Imagenes/Capital.png", labelPosition: { x: 900.7, y: 365 }, desc_es: "Una ciudad de calles históricas y ambiente vibrante, sabores deliciosos y rica cultura, San José se encuentra en el corazón de Costa Rica, custodiada por los imponentes picos de volcanes y montañas. Un lugar lleno de maravillas propias, también es el punto de partida ideal para explorar la gloriosa naturaleza del exuberante Valle Central. Al dejar atrás los bulliciosos bulevares, es fácil encontrarse rodeado de paisajes espectaculares. Asómate al cráter del activo Volcán Poás, adéntrate en los encantos del bosque nuboso, descubre lagunas turquesa y barro burbujeante, o recorre los Bajos del Toro para encontrar majestuosas cataratas y refrescantes pozas para nadar: todo te espera justo a las afueras de la ciudad.", desc_en: "A city of historic streets and vibrant atmosphere, delicious eats and rich culture, San Jose sits at Costa Rica’s heart, watched over by dramatic peaks of volcanoes and mountains. A place full of wonders of its own, it is also a base from which to explore the glorious nature of the lush Central Valley. Leaving bustling boulevards behind, it’s easy to find yourself in spectacular landscapes. Peer into the crater of the active Poas Volcano, delve into the enchantments of the cloud forest, stumble upon turquoise lakes and bubbling mud, or hike the Bajos del Toro to find towering waterfalls and refreshing swimming holes aplenty – it’s all there waiting for you, right on the edge of the city.", locations: [ { name: "San Jose", cx: 616.4, cy: 255.1 }, { name: "Heredia", cx: 614.1, cy: 228.4 }, { name: "Alajuela", cx: 584.2, cy: 240.4 }, { name: "Cartago", cx: 650.5, cy: 265.4 } ] }
+            ];
+
+            // Elementos del DOM
+            const mapSvg = document.getElementById('costa-rica-map-svg');
+            const mapContainer = document.getElementById('map-container');
+            const imagePatterns = document.getElementById('image-patterns');
+            const ecosystemMarkersGroup = document.getElementById('ecosystem-markers-group');
+            const ecosystemLabelsGroup = document.getElementById('ecosystem-labels-group');
+            const locationMarkersGroup = document.getElementById('location-markers-group');
+            const descriptionGroup = document.getElementById('ecosystem-description-group');
+            const toggleAllBtn = document.getElementById('toggle-all-btn');
+            const ecosystemNavigator = document.getElementById('ecosystem-navigator');
+            const imagePreloader = document.getElementById('image-preloader');
+            const langEsBtn = document.getElementById('lang-es');
+            const langEnBtn = document.getElementById('lang-en');
+            const infoPanelContainer = document.getElementById('info-panel-container');
+            const infoPanel = document.getElementById('info-panel');
+            const panelToggleBtn = document.getElementById('panel-toggle-btn');
+            
+            // Variables de estado
+            const initialView = { x: 374.1, y: 34.3, width: 399.1, height: 513.1 };
+            const allShownView = { x: 236.8, y: -108.1, width: 577.5, height: 742.5 };
+            let currentViewBox = { ...initialView };
+            let activeEcosystemId = null;
+            let isDraggingMap = false;
+            let dragStartPoint = { x: 0, y: 0 };
+            let dragStartViewBox = { x: 0, y: 0, width: 0, height: 0 };
+            let initialPinchDistance = -1;
+            let areAllExpanded = false;
+            let currentLang = 'es';
+            let isPanelHidden = false;
+
+            // --- Funciones de Interacción con el Mapa (Arrastre y Zoom) ---
+            
+            function setViewBox(newViewBox, smooth = false) {
+                if (smooth) {
+                    const start = { ...currentViewBox };
+                    const end = newViewBox;
+                    const duration = 750;
+                    let startTime = null;
+
+                    function animate(currentTime) {
+                        if (startTime === null) startTime = currentTime;
+                        const progress = Math.min((currentTime - startTime) / duration, 1);
+                        
+                        currentViewBox.x = start.x + (end.x - start.x) * progress;
+                        currentViewBox.y = start.y + (end.y - start.y) * progress;
+                        currentViewBox.width = start.width + (end.width - start.width) * progress;
+                        currentViewBox.height = start.height + (end.height - start.height) * progress;
+
+                        mapSvg.setAttribute('viewBox', `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(animate);
+                        } else {
+                            currentViewBox = { ...end };
+                            mapSvg.setAttribute('viewBox', `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
+                        }
+                    }
+                    requestAnimationFrame(animate);
+                } else {
+                    currentViewBox = { ...newViewBox };
+                    mapSvg.setAttribute('viewBox', `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
+                }
+            }
+
+            function setInitialViewBox() {
+                setViewBox(initialView);
+            }
+
+            function handleInteractionStart(e) {
+                if (e.target.closest('.map-action-button, .lang-switcher, .ecosystem-navigator, #panel-toggle-btn')) return;
+                if (e.target.classList.contains('ecosystem-marker') || e.target.classList.contains('location-marker')) return;
+                e.preventDefault();
+                if (e.type === 'mousedown') {
+                    isDraggingMap = true;
+                    mapContainer.classList.add('dragging');
+                    dragStartPoint = { x: e.clientX, y: e.clientY };
+                    dragStartViewBox = { ...currentViewBox };
+                } else if (e.type === 'touchstart') {
+                    if (e.touches.length === 1) {
+                        isDraggingMap = true;
+                        mapContainer.classList.add('dragging');
+                        dragStartPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                        dragStartViewBox = { ...currentViewBox };
+                    } else if (e.touches.length === 2) {
+                        isDraggingMap = false;
+                        initialPinchDistance = getPinchDistance(e.touches);
+                    }
+                }
+            }
+
+            function handleInteractionMove(e) {
+                if (isDraggingMap) {
+                    const svgRect = mapSvg.getBoundingClientRect();
+                    const scaleX = dragStartViewBox.width / svgRect.width;
+                    const scaleY = dragStartViewBox.height / svgRect.height;
+                    let currentClientX, currentClientY;
+
+                    if (e.type === 'mousemove') {
+                        currentClientX = e.clientX;
+                        currentClientY = e.clientY;
+                    } else if (e.type === 'touchmove' && e.touches.length === 1) {
+                        e.preventDefault();
+                        currentClientX = e.touches[0].clientX;
+                        currentClientY = e.touches[0].clientY;
+                    } else {
+                        return;
+                    }
+
+                    const dx = currentClientX - dragStartPoint.x;
+                    const dy = currentClientY - dragStartPoint.y;
+
+                    currentViewBox.x = dragStartViewBox.x - (dx * scaleX);
+                    currentViewBox.y = dragStartViewBox.y - (dy * scaleY);
+
+                    mapSvg.setAttribute('viewBox', `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
+                } else if (e.type === 'touchmove' && e.touches.length === 2) {
+                    handlePinchZoom(e);
+                }
+            }
+            
+            function handlePinchZoom(e) {
+                if (e.touches.length !== 2) return;
+                e.preventDefault();
+                const svgRect = mapSvg.getBoundingClientRect();
+                const currentPinchDistance = getPinchDistance(e.touches);
+                if (initialPinchDistance <= 0) {
+                    initialPinchDistance = currentPinchDistance;
+                    return;
+                }
+                const zoomAmount = initialPinchDistance / currentPinchDistance;
+                const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                const pointX = currentViewBox.x + ((centerX - svgRect.left) / svgRect.width) * currentViewBox.width;
+                const pointY = currentViewBox.y + ((centerY - svgRect.top) / svgRect.height) * currentViewBox.height;
+                const newWidth = currentViewBox.width * zoomAmount;
+                const newHeight = currentViewBox.height * zoomAmount;
+                currentViewBox.x = pointX - (pointX - currentViewBox.x) * (newWidth / currentViewBox.width);
+                currentViewBox.y = pointY - (pointY - currentViewBox.y) * (newHeight / currentViewBox.height);
+                currentViewBox.width = newWidth;
+                currentViewBox.height = newHeight;
+                mapSvg.setAttribute('viewBox', `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
+                initialPinchDistance = currentPinchDistance;
+            }
+
+            function handleInteractionEnd() {
+                isDraggingMap = false;
+                mapContainer.classList.remove('dragging');
+                initialPinchDistance = -1;
+            }
+
+            function handleWheel(e) {
+                e.preventDefault();
+                const zoomFactor = 0.1;
+                const svgRect = mapSvg.getBoundingClientRect();
+                const svgX = e.clientX - svgRect.left;
+                const svgY = e.clientY - svgRect.top;
+                const pointX = currentViewBox.x + (svgX / svgRect.width) * currentViewBox.width;
+                const pointY = currentViewBox.y + (svgY / svgRect.height) * currentViewBox.height;
+                const delta = e.deltaY > 0 ? 1 : -1;
+                const newWidth = currentViewBox.width * (1 + delta * zoomFactor);
+                const newHeight = currentViewBox.height * (1 + delta * zoomFactor);
+                currentViewBox.x = pointX - (pointX - currentViewBox.x) * (newWidth / currentViewBox.width);
+                currentViewBox.y = pointY - (pointY - currentViewBox.y) * (newHeight / currentViewBox.height);
+                currentViewBox.width = newWidth;
+                currentViewBox.height = newHeight;
+                mapSvg.setAttribute('viewBox', `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
+            }
+
+            function getPinchDistance(touches) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            // --- Lógica de Ecosistemas ---
+
+            function createImagePatterns() {
+                ecosystemsData.forEach(eco => {
+                    const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+                    pattern.setAttribute('id', `pattern-${eco.id}`);
+                    pattern.setAttribute('patternContentUnits', 'objectBoundingBox');
+                    pattern.setAttribute('width', '1');
+                    pattern.setAttribute('height', '1');
+
+                    const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+                    image.setAttribute('href', eco.imageUrl);
+                    image.setAttribute('x', '0');
+                    image.setAttribute('y', '0');
+                    image.setAttribute('width', '1');
+                    image.setAttribute('height', '1');
+                    image.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+                    
+                    pattern.appendChild(image);
+                    imagePatterns.appendChild(pattern);
+                });
+            }
+
+            function transitionEcosystem(ecosystemId, toState, labelStyle = 'default') {
+                const ecosystem = ecosystemsData.find(eco => eco.id === ecosystemId);
+                const markerElement = document.getElementById(ecosystemId);
+                const labelElement = document.getElementById(`label-${ecosystemId}`);
+                if (!ecosystem || !markerElement || !labelElement) return;
+
+                const targetState = ecosystem[toState];
+                labelElement.innerHTML = ''; // Limpiar tspans
+                
+                // Aplicar estilo de imagen y marco
+                if (toState === 'open') {
+                    markerElement.style.fill = `url(#pattern-${ecosystem.id})`;
+                    markerElement.style.stroke = ecosystem.color;
+                    markerElement.classList.add('expanded');
+                } else {
+                    markerElement.style.fill = ecosystem.color;
+                    markerElement.style.stroke = 'none';
+                    markerElement.classList.remove('expanded');
+                }
+
+                // Aplicar estilo de etiqueta
+                labelElement.classList.remove('on-image', 'external');
+                let labelX, labelY;
+
+                if (labelStyle === 'external') {
+                    labelElement.classList.add('external');
+                    labelX = ecosystem.labelPosition.x;
+                    labelY = ecosystem.labelPosition.y;
+                    const words = ecosystem.name.split(' ');
+                    const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                    tspan1.textContent = words[0];
+                    tspan1.setAttribute('x', labelX);
+                    labelElement.appendChild(tspan1);
+                    if (words.length > 1) {
+                        const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                        tspan2.textContent = words.slice(1).join(' ');
+                        tspan2.setAttribute('x', labelX);
+                        tspan2.setAttribute('dy', '1.2em');
+                        labelElement.appendChild(tspan2);
+                    }
+                } else if (labelStyle === 'on-image') {
+                    labelElement.classList.add('on-image');
+                    labelX = targetState.cx;
+                    labelY = targetState.cy;
+                    const words = ecosystem.name.split(' ');
+                    const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                    tspan1.textContent = words[0];
+                    tspan1.setAttribute('x', labelX);
+                    tspan1.setAttribute('dy', '-0.6em');
+                    labelElement.appendChild(tspan1);
+                    if (words.length > 1) {
+                        const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                        tspan2.textContent = words.slice(1).join(' ');
+                        tspan2.setAttribute('x', labelX);
+                        tspan2.setAttribute('dy', '1.2em');
+                        labelElement.appendChild(tspan2);
+                    }
+                } else { // Default style (initial state)
+                    labelX = targetState.cx;
+                    labelY = targetState.cy - targetState.r - 10;
+                    const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                    tspan.textContent = ecosystem.name;
+                    tspan.setAttribute('x', labelX);
+                    labelElement.appendChild(tspan);
+                }
+                
+                // Aplicar transformaciones
+                markerElement.setAttribute('cx', targetState.cx);
+                markerElement.setAttribute('cy', targetState.cy);
+                markerElement.setAttribute('r', targetState.r);
+                labelElement.setAttribute('x', labelX);
+                labelElement.setAttribute('y', labelY);
+                labelElement.setAttribute('font-size', toState === 'open' ? '16px' : '12px');
+
+                if (labelStyle === 'external') {
+                    labelElement.setAttribute('font-size', '18px');
+                }
+            }
+            
+            function renderEcosystemMarkers() {
+                ecosystemMarkersGroup.innerHTML = '';
+                ecosystemLabelsGroup.innerHTML = '';
+                ecosystemsData.forEach(ecosystem => {
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('id', ecosystem.id);
+                    circle.classList.add('ecosystem-marker');
+                    circle.setAttribute('cx', ecosystem.initial.cx);
+                    circle.setAttribute('cy', ecosystem.initial.cy);
+                    circle.setAttribute('r', ecosystem.initial.r);
+                    circle.style.fill = ecosystem.color;
+                    circle.addEventListener('click', (e) => {
+                        e.stopPropagation(); 
+                        if (activeEcosystemId === ecosystem.id) {
+                            collapseAllEcosystems();
+                        } else {
+                            setActiveEcosystemMarker(ecosystem.id);
+                        }
+                    });
+                    ecosystemMarkersGroup.appendChild(circle);
+
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('id', `label-${ecosystem.id}`);
+                    text.classList.add('ecosystem-label');
+                    text.setAttribute('x', ecosystem.initial.cx);
+                    text.setAttribute('y', ecosystem.initial.cy - ecosystem.initial.r - 10);
+                    text.setAttribute('font-size', '12px');
+                    text.textContent = ecosystem.name;
+                    ecosystemLabelsGroup.appendChild(text);
+                });
+            }
+
+            function setActiveEcosystemMarker(newEcosystemId) {
+                const ecosystem = ecosystemsData.find(item => item.id === newEcosystemId);
+                if (!ecosystem) return;
+
+                setViewBox(ecosystem.zoomView, true);
+
+                ecosystemsData.forEach(eco => {
+                    const marker = document.getElementById(eco.id);
+                    const label = document.getElementById(`label-${eco.id}`);
+                    if (eco.id !== newEcosystemId) {
+                        marker?.classList.add('hidden');
+                        label?.classList.add('hidden');
+                    } else {
+                        marker?.classList.remove('hidden');
+                        label?.classList.remove('hidden');
+                    }
+                });
+                
+                if (activeEcosystemId) {
+                    transitionEcosystem(activeEcosystemId, 'initial');
+                    document.getElementById(activeEcosystemId)?.classList.remove('active');
+                }
+                transitionEcosystem(newEcosystemId, 'open', 'external');
+                document.getElementById(newEcosystemId)?.classList.add('active');
+                activeEcosystemId = newEcosystemId;
+                showRelatedLocationMarkers(ecosystem);
+                updateEcosystemNavigator(newEcosystemId);
+                updateDescription(newEcosystemId);
+                areAllExpanded = false;
+                toggleAllBtn.textContent = "Show All";
+                if (panelToggleBtn) panelToggleBtn.classList.add('visible');
+            }
+
+            function createLocationMarker(location, ecosystem, index) {
+                const locationId = `loc-${ecosystem.id}-${index}`;
+                const locationCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                locationCircle.setAttribute('id', locationId);
+                locationCircle.classList.add('location-marker');
+                locationCircle.setAttribute('cx', location.cx);
+                locationCircle.setAttribute('cy', location.cy);
+                locationCircle.setAttribute('r', 8);
+                locationCircle.style.fill = ecosystem.color;
+                locationCircle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    collapseAllEcosystems();
+                });
+
+                const locationText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                locationText.setAttribute('id', `${locationId}-text`);
+                locationText.setAttribute('x', location.cx);
+                locationText.setAttribute('y', location.cy);
+                locationText.textContent = location.name;
+                locationText.classList.add('location-marker-text');
+
+                locationMarkersGroup.appendChild(locationCircle);
+                locationMarkersGroup.appendChild(locationText);
+
+                setTimeout(() => {
+                    locationCircle.classList.add('visible');
+                    locationText.classList.add('visible');
+                }, 50 * index);
+            }
+
+            function hideAllLocationMarkers() {
+                locationMarkersGroup.innerHTML = '';
+            }
+            
+            function showRelatedLocationMarkers(ecosystem) {
+                hideAllLocationMarkers();
+                ecosystem.locations.forEach((location, index) => {
+                    createLocationMarker(location, ecosystem, index);
+                });
+            }
+            
+            function showAllLocationMarkersForAllEcosystems() {
+                hideAllLocationMarkers();
+                ecosystemsData.forEach(ecosystem => {
+                    ecosystem.locations.forEach((location, index) => {
+                        createLocationMarker(location, ecosystem, index);
+                    });
+                });
+            }
+
+            function expandAllEcosystems() {
+                setViewBox(allShownView, true);
+                ecosystemsData.forEach((eco, index) => {
+                    setTimeout(() => {
+                        transitionEcosystem(eco.id, 'open', 'on-image');
+                        document.getElementById(eco.id)?.classList.remove('hidden');
+                        document.getElementById(`label-${eco.id}`)?.classList.remove('hidden');
+                    }, index * 50);
+                });
+                showAllLocationMarkersForAllEcosystems();
+                if(activeEcosystemId) {
+                    document.getElementById(activeEcosystemId)?.classList.remove('active');
+                    activeEcosystemId = null;
+                }
+                areAllExpanded = true;
+                toggleAllBtn.textContent = "Hide All";
+                if(ecosystemNavigator) ecosystemNavigator.classList.remove('visible');
+                updateDescription(null);
+            }
+
+            function collapseAllEcosystems() {
+                setViewBox(initialView, true);
+                ecosystemsData.forEach(eco => {
+                    transitionEcosystem(eco.id, 'initial', 'default');
+                    document.getElementById(eco.id)?.classList.remove('hidden');
+                    document.getElementById(`label-${eco.id}`)?.classList.remove('hidden');
+                });
+                hideAllLocationMarkers();
+                if(activeEcosystemId) {
+                    document.getElementById(activeEcosystemId)?.classList.remove('active');
+                    activeEcosystemId = null;
+                }
+                areAllExpanded = false;
+                toggleAllBtn.textContent = "Show All";
+                if(ecosystemNavigator) ecosystemNavigator.classList.remove('visible');
+                updateDescription(null);
+                if (panelToggleBtn) panelToggleBtn.classList.remove('visible');
+            }
+
+            function updateEcosystemNavigator(activeId) {
+                if(!ecosystemNavigator) return;
+                ecosystemNavigator.innerHTML = ''; // Limpiar círculos anteriores
+                const otherEcosystems = ecosystemsData.filter(eco => eco.id !== activeId);
+                
+                otherEcosystems.forEach(eco => {
+                    const navItem = document.createElement('div');
+                    navItem.className = 'nav-item';
+                    navItem.dataset.id = eco.id;
+
+                    const navLabel = document.createElement('span');
+                    navLabel.className = 'nav-label';
+                    navLabel.textContent = eco.name;
+                    
+                    const navCircle = document.createElement('div');
+                    navCircle.classList.add('nav-circle');
+                    navCircle.style.backgroundColor = eco.color;
+                    
+                    navItem.appendChild(navLabel);
+                    navItem.appendChild(navCircle);
+
+                    navItem.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        setActiveEcosystemMarker(eco.id);
+                    });
+                    ecosystemNavigator.appendChild(navItem);
+                });
+
+                ecosystemNavigator.classList.add('visible');
+            }
+
+            function updateDescription(ecosystemId) {
+                const panelText = infoPanel.querySelector('p');
+
+                if (!ecosystemId) {
+                    infoPanelContainer.classList.remove('visible');
+                    return;
+                }
+
+                const ecosystem = ecosystemsData.find(eco => eco.id === ecosystemId);
+                if (!ecosystem) return;
+                
+                // Convert hex to rgba for gradient
+                const hexToRgba = (hex, alpha) => {
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                };
+                
+                const darkenColor = (hex, percent) => {
+                    let r = parseInt(hex.slice(1, 3), 16);
+                    let g = parseInt(hex.slice(3, 5), 16);
+                    let b = parseInt(hex.slice(5, 7), 16);
+
+                    r = parseInt(r * (1 - percent));
+                    g = parseInt(g * (1 - percent));
+                    b = parseInt(b * (1 - percent));
+
+                    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+                };
+
+                infoPanel.style.background = `linear-gradient(135deg, ${hexToRgba(ecosystem.color, 0.5)} 0%, ${hexToRgba(ecosystem.color, 0.3)} 100%)`;
+                infoPanel.style.borderColor = hexToRgba(ecosystem.color, 0.9);
+                
+                const darkColor = darkenColor(ecosystem.color, 0.2);
+                infoPanel.style.setProperty('--scrollbar-color', darkColor);
+                infoPanel.style.setProperty('--scrollbar-hover-color', darkenColor(ecosystem.color, 0.3));
+
+
+                panelText.textContent = currentLang === 'es' ? ecosystem.desc_es : ecosystem.desc_en;
+                if (!isPanelHidden) {
+                    infoPanelContainer.classList.add('visible');
+                }
+            }
+
+            async function preloadAllImages() {
+                toggleAllBtn.textContent = "Cargando...";
+                toggleAllBtn.disabled = true;
+
+                const promises = ecosystemsData.map(eco => {
+                    return new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.src = eco.imageUrl;
+                        img.onload = resolve;
+                        img.onerror = () => reject(new Error(`Failed to load image: ${eco.imageUrl}`));
+                    });
+                });
+
+                try {
+                    await Promise.all(promises);
+                    console.log("All images preloaded successfully.");
+                } catch (error) {
+                    console.error("Error preloading images. Check image paths and ensure they are correct.", error);
+                } finally {
+                    toggleAllBtn.textContent = "Show All";
+                    toggleAllBtn.disabled = false;
+                }
+            }
+
+            // --- Inicialización y Event Listeners ---
+            async function initializeApp() {
+                setInitialViewBox();
+                createImagePatterns();
+                renderEcosystemMarkers();
+                await preloadAllImages(); // Espera a que las imágenes se carguen
+            }
+
+
+            initializeApp();
+
+            mapContainer.addEventListener('mousedown', handleInteractionStart);
+            mapContainer.addEventListener('mousemove', handleInteractionMove);
+            mapContainer.addEventListener('mouseup', handleInteractionEnd);
+            mapContainer.addEventListener('mouseleave', handleInteractionEnd);
+            mapContainer.addEventListener('wheel', handleWheel);
+
+            mapContainer.addEventListener('touchstart', handleInteractionStart, { passive: false });
+            mapContainer.addEventListener('touchmove', (e) => {
+                handleInteractionMove(e);
+            }, { passive: false });
+            mapContainer.addEventListener('touchend', handleInteractionEnd);
+            mapContainer.addEventListener('touchcancel', handleInteractionEnd);
+
+            toggleAllBtn.addEventListener('click', () => {
+                if (areAllExpanded) {
+                    collapseAllEcosystems();
+                } else {
+                    expandAllEcosystems();
+                }
+            });
+
+            langEsBtn.addEventListener('click', () => {
+                currentLang = 'es';
+                langEsBtn.classList.add('active');
+                langEnBtn.classList.remove('active');
+                if (activeEcosystemId) {
+                    updateDescription(activeEcosystemId);
+                }
+            });
+
+            langEnBtn.addEventListener('click', () => {
+                currentLang = 'en';
+                langEnBtn.classList.add('active');
+                langEsBtn.classList.remove('active');
+                if (activeEcosystemId) {
+                    updateDescription(activeEcosystemId);
+                }
+            });
+
+            if (panelToggleBtn) {
+                panelToggleBtn.addEventListener('click', () => {
+                    isPanelHidden = !isPanelHidden;
+                    infoPanelContainer.classList.toggle('hidden');
+                    panelToggleBtn.classList.toggle('hidden-state');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

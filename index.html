@@ -684,7 +684,7 @@
                 if (toState === 'open') {
                     // CAMBIO: Antes usaba `url(#pattern-${ecosystem.id})`
                     markerElement.style.fill = ecosystem.color; // Ahora usamos el color sólido del objeto data
-                    markerElement.style.stroke = "#FFFFFF"; // Un borde blanco para resaltar el círculo sólido
+                    markerElement.style.stroke = "none";
                     markerElement.classList.add('expanded');
                 } else {
                     markerElement.style.fill = ecosystem.color;
@@ -1066,4 +1066,5 @@
     </script>
 </body>
 </html>
+
 
